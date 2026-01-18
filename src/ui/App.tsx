@@ -261,7 +261,6 @@ function App() {
         onNewSession={handleNewSession}
         onDeleteSession={handleDeleteSession}
         onOpenSettings={() => setShowSettingsModal(true)}
-        currentModel={apiSettings?.model}
       />
 
       <main className="flex flex-1 flex-col ml-[280px] bg-surface-cream overflow-hidden">

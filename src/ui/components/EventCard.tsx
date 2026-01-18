@@ -70,7 +70,7 @@ const StatusDot = ({ variant = "accent", isActive = false, isVisible = true }: {
 const SessionResult = ({ message }: { message: SDKResultMessage }) => {
   const formatMinutes = (ms: number | undefined) => typeof ms !== "number" ? "-" : `${(ms / 60000).toFixed(2)} min`;
   const formatUsd = (usd: number | undefined) => typeof usd !== "number" ? "-" : usd.toFixed(2);
-  const formatMillions = (tokens: number | undefined) => typeof tokens !== "number" ? "-" : `${(tokens / 1_000_000).toFixed(4)} M`;
+  const formatMillions = (tokens: number | undefined) => typeof tokens !== "number" ? "-" : `${(tokens / 1_000_000).toFixed(3)}m`;
   
   // Always hide cost display - not relevant for local models and confusing for users
   const hasCost = false;
@@ -87,8 +87,8 @@ const SessionResult = ({ message }: { message: SDKResultMessage }) => {
         </div>
         <div className="flex flex-wrap items-center gap-2 text-[14px]">
           <span className="font-normal">Tokens</span>
-          <span className="inline-flex items-center rounded-full bg-surface-tertiary px-2.5 py-0.5 text-ink-700 text-[13px]">Input {formatMillions(message.usage?.input_tokens)}</span>
-          <span className="inline-flex items-center rounded-full bg-surface-tertiary px-2.5 py-0.5 text-ink-700 text-[13px]">Output {formatMillions(message.usage?.output_tokens)}</span>
+          <span className="inline-flex items-center rounded-full bg-surface-tertiary px-2.5 py-0.5 text-ink-700 text-[13px]">input:{formatMillions(message.usage?.input_tokens)}</span>
+          <span className="inline-flex items-center rounded-full bg-surface-tertiary px-2.5 py-0.5 text-ink-700 text-[13px]">output:{formatMillions(message.usage?.output_tokens)}</span>
           {hasCost && (
             <span className="inline-flex items-center rounded-full bg-accent/10 px-2.5 py-0.5 text-accent text-[13px]">
               ${formatUsd(message.total_cost_usd)}
@@ -151,10 +151,10 @@ const ToolResult = ({ messageContent }: { messageContent: ToolResultContent }) =
   }, [hasMoreLines, isExpanded]);
 
   return (
-    <div className="flex flex-col mt-4">
+    <div className="flex flex-col mt-4 overflow-hidden">
       <div className="header text-accent">Output</div>
-      <div className="mt-2 rounded-xl bg-surface-tertiary p-3">
-        <pre className={`text-sm whitespace-pre-wrap break-words font-mono ${isError ? "text-red-500" : "text-ink-700"}`}>
+      <div className="mt-2 rounded-xl bg-surface-tertiary p-3 overflow-hidden">
+        <pre className={`text-sm whitespace-pre-wrap break-words font-mono overflow-x-auto ${isError ? "text-red-500" : "text-ink-700"}`}>
           {isMarkdownContent ? <MDContent text={visibleContent} /> : visibleContent}
         </pre>
         {hasMoreLines && (
@@ -183,7 +183,7 @@ const AssistantBlockCard = ({ title, text, showIndicator = false, isTextBlock = 
   };
 
   return (
-    <div className="flex flex-col mt-4">
+    <div className="flex flex-col mt-4 overflow-hidden">
       <div className="header text-accent flex items-center gap-2">
         <StatusDot variant="success" isActive={showIndicator} isVisible={showIndicator} />
         {title}
@@ -299,7 +299,7 @@ const AskUserQuestionCard = ({
   }
 
   return (
-    <div className="flex flex-col gap-2 rounded-[1rem] bg-surface-tertiary px-3 py-2 mt-4">
+    <div className="flex flex-col gap-2 rounded-[1rem] bg-surface-tertiary px-3 py-2 mt-4 overflow-hidden">
       <div className="flex flex-row items-center gap-2">
         <StatusDot variant="success" isActive={false} isVisible={true} />
         <span className="inline-flex items-center rounded-md text-accent py-0.5 text-sm font-medium">AskUserQuestion</span>
@@ -324,7 +324,7 @@ const SystemInfoCard = ({ message, showIndicator = false }: { message: SDKMessag
   );
   
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex flex-col gap-2 overflow-hidden">
       <div className="header text-accent flex items-center gap-2">
         <StatusDot variant="success" isActive={showIndicator} isVisible={showIndicator} />
         System Init
@@ -364,7 +364,7 @@ const UserMessageCard = ({
   };
 
   return (
-    <div className="flex flex-col mt-4 group">
+    <div className="flex flex-col mt-4 group overflow-hidden">
       <div className="header text-accent flex items-center gap-2">
         <StatusDot variant="success" isActive={showIndicator} isVisible={showIndicator} />
         User
@@ -374,7 +374,7 @@ const UserMessageCard = ({
           <textarea
             value={editedText}
             onChange={(e) => setEditedText(e.target.value)}
-            className="w-full min-h-[100px] p-3 rounded-lg bg-surface-secondary border border-ink-900/10 focus:border-accent focus:outline-none resize-y"
+            className="w-full min-h-[100px] p-3 rounded-lg bg-surface-secondary border border-ink-900/10 focus:border-accent focus:outline-none resize-y max-w-full overflow-hidden"
             autoFocus
           />
           <div className="flex gap-2">

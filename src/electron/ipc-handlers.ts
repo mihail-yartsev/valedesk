@@ -27,6 +27,18 @@ function emit(event: ServerEvent) {
     sessions.updateSession(event.payload.sessionId, { status: event.payload.status });
   }
   if (event.type === "stream.message") {
+    const message = event.payload.message as any;
+    // Check if this is a result message with token usage
+    if (message.type === "result" && message.usage) {
+      const { input_tokens, output_tokens } = message.usage;
+      if (input_tokens !== undefined || output_tokens !== undefined) {
+        sessions.updateTokens(
+          event.payload.sessionId,
+          input_tokens || 0,
+          output_tokens || 0
+        );
+      }
+    }
     sessions.recordMessage(event.payload.sessionId, event.payload.message);
   }
   if (event.type === "stream.user_prompt") {
@@ -61,7 +73,9 @@ export function handleClientEvent(event: ClientEvent) {
       payload: {
         sessionId: history.session.id,
         status: history.session.status,
-        messages: history.messages
+        messages: history.messages,
+        inputTokens: history.session.inputTokens,
+        outputTokens: history.session.outputTokens
       }
     });
     return;
@@ -364,6 +378,98 @@ export function handleClientEvent(event: ClientEvent) {
   if (event.type === "open.external") {
     shell.openExternal(event.payload.url);
     return;
+  }
+
+  if (event.type === "models.get") {
+    fetchModels().then(models => {
+      emit({
+        type: "models.loaded",
+        payload: { models }
+      });
+    }).catch(error => {
+      console.error('[IPC] Failed to fetch models:', error);
+      emit({
+        type: "models.error",
+        payload: { message: String(error) }
+      });
+    });
+    return;
+  }
+}
+
+async function fetchModels(): Promise<Array<{ id: string; name: string; description?: string }>> {
+  const settings = loadApiSettings();
+
+  if (!settings || !settings.baseUrl || !settings.apiKey) {
+    throw new Error('API settings not configured');
+  }
+
+  // Build the models URL
+  // For standard OpenAI-compatible APIs, add /v1/models
+  // For z.ai URLs that already contain /v4, extract the base URL and append /models
+  let modelsURL: string;
+  const baseURL = settings.baseUrl;
+
+  // Check if baseURL already ends with /v1 (standard OpenAI format)
+  if (baseURL.endsWith('/v1')) {
+    modelsURL = `${baseURL}/models`;
+  }
+  // Check if baseURL contains /v4 (z.ai format)
+  else if (baseURL.includes('/v4')) {
+    // Extract base URL up to /v4
+    const v4Index = baseURL.indexOf('/v4');
+    const baseURLUpToV4 = baseURL.substring(0, v4Index + 3); // Include /v4
+    modelsURL = `${baseURLUpToV4}/models`;
+  }
+  // Check if baseURL ends with / (trailing slash)
+  else if (baseURL.endsWith('/')) {
+    modelsURL = `${baseURL}v1/models`;
+  }
+  // Default: add /v1/models
+  else {
+    modelsURL = `${baseURL}/v1/models`;
+  }
+
+  console.log('[IPC] Fetching models from:', modelsURL);
+
+  try {
+    const response = await fetch(modelsURL, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${settings.apiKey}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`API Error (${response.status}): ${errorText}`);
+    }
+
+    const data = await response.json();
+    
+    // Handle different response formats
+    if (data.data && Array.isArray(data.data)) {
+      // OpenAI-style response: { data: [{ id, ... }] }
+      return data.data.map((model: any) => ({
+        id: model.id,
+        name: model.name || model.id,
+        description: model.description
+      }));
+    } else if (Array.isArray(data)) {
+      // Simple array response: [{ id, ... }]
+      return data.map((model: any) => ({
+        id: model.id,
+        name: model.name || model.id,
+        description: model.description
+      }));
+    } else {
+      console.warn('[IPC] Unexpected models response format:', data);
+      return [];
+    }
+  } catch (error) {
+    console.error('[IPC] Error fetching models:', error);
+    throw error;
   }
 }
 

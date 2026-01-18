@@ -20,6 +20,8 @@ export type SessionView = {
   createdAt?: number;
   updatedAt?: number;
   hydrated: boolean;
+  inputTokens?: number;
+  outputTokens?: number;
 };
 
 interface AppState {
@@ -113,7 +115,9 @@ export const useAppStore = create<AppState>((set, get) => ({
             cwd: session.cwd,
             isPinned: session.isPinned,
             createdAt: session.createdAt,
-            updatedAt: session.updatedAt
+            updatedAt: session.updatedAt,
+            inputTokens: session.inputTokens,
+            outputTokens: session.outputTokens
           };
         }
 
@@ -148,13 +152,21 @@ export const useAppStore = create<AppState>((set, get) => ({
       }
 
       case "session.history": {
-        const { sessionId, messages, status } = event.payload;
+        const { sessionId, messages, status, inputTokens, outputTokens } = event.payload;
         set((state) => {
           const existing = state.sessions[sessionId] ?? createSession(sessionId);
           return {
             sessions: {
               ...state.sessions,
-              [sessionId]: { ...existing, status, messages, hydrated: true }
+              [sessionId]: {
+                ...existing,
+                status,
+                messages,
+                hydrated: true,
+                // Use token counts from payload (from DB), fallback to existing values
+                inputTokens: inputTokens ?? existing.inputTokens,
+                outputTokens: outputTokens ?? existing.outputTokens
+              }
             }
           };
         });
@@ -218,10 +230,29 @@ export const useAppStore = create<AppState>((set, get) => ({
         
         set((state) => {
           const existing = state.sessions[sessionId] ?? createSession(sessionId);
+
+          // Extract token usage from result messages
+          let inputTokens = existing.inputTokens;
+          let outputTokens = existing.outputTokens;
+          if (message.type === "result" && message.usage) {
+            const { input_tokens, output_tokens } = message.usage;
+            if (input_tokens !== undefined) {
+              inputTokens = input_tokens;
+            }
+            if (output_tokens !== undefined) {
+              outputTokens = output_tokens;
+            }
+          }
+
           return {
             sessions: {
               ...state.sessions,
-              [sessionId]: { ...existing, messages: [...existing.messages, message] }
+              [sessionId]: {
+                ...existing,
+                messages: [...existing.messages, message],
+                inputTokens,
+                outputTokens
+              }
             }
           };
         });

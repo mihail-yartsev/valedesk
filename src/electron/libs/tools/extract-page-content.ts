@@ -1,9 +1,11 @@
 /**
  * ExtractPageContentTool - Extract full content from web pages using Tavily API
+ * Note: Z.AI does not currently support page extraction, only web search
  */
 
 import { tavily } from '@tavily/core';
 import type { ToolDefinition, ToolResult, ToolExecutionContext } from './base-tool.js';
+import type { WebSearchProvider } from '../../types.js';
 
 export interface ExtractPageParams {
   urls: string[];
@@ -22,7 +24,7 @@ export const ExtractPageContentToolDefinition: ToolDefinition = {
   type: "function",
   function: {
     name: "ExtractPageContent",
-    description: "Extract full detailed content from specific web pages. Use AFTER WebSearch to get complete page content from URLs found in search results. Returns full page content in readable format. Best for deep analysis of specific pages and extracting structured data.",
+    description: "Extract full detailed content from specific web pages. Use AFTER WebSearch to get complete page content from URLs found in search results. Returns full page content in readable format. Best for deep analysis of specific pages and extracting structured data. Note: Only available when using Tavily as the web search provider. When using Z.AI as the web search provider, use ZaiReader tool instead.",
     parameters: {
       type: "object",
       properties: {
@@ -47,8 +49,16 @@ export const ExtractPageContentToolDefinition: ToolDefinition = {
 
 export class ExtractPageContentTool {
   private tvly: any;
+  private provider: WebSearchProvider;
 
-  constructor(apiKey: string) {
+  constructor(apiKey: string, provider: WebSearchProvider = 'tavily') {
+    this.provider = provider;
+
+    // Page extraction is only available with Tavily
+    if (provider !== 'tavily') {
+      throw new Error('Page extraction is only available when using Tavily as the web search provider. Please switch to Tavily in Settings or use the web search results directly.');
+    }
+
     if (!apiKey || apiKey === 'dummy-key') {
       throw new Error('Tavily API key not configured. Please set it in Settings.');
     }
@@ -106,7 +116,7 @@ export class ExtractPageContentTool {
     results.forEach((result, index) => {
       const sourceNum = index + 1;
       formatted += `**[Source ${sourceNum}]** ${result.url}\n`;
-      
+
       if (result.success) {
         const preview = result.content.substring(0, contentLimit);
         formatted += `📊 **Content** (${result.char_count} characters total):\n\n`;
@@ -118,7 +128,7 @@ export class ExtractPageContentTool {
       } else {
         formatted += `❌ **Extraction Failed**: ${result.error || 'Unknown error'}\n\n`;
       }
-      
+
       formatted += '---\n\n';
     });
 

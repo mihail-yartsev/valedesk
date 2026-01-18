@@ -1,4 +1,4 @@
-import { BrowserWindow } from "electron";
+import { BrowserWindow, shell } from "electron";
 import type { ClientEvent, ServerEvent } from "./types.js";
 // import { runClaude, type RunnerHandle } from "./libs/runner.js"; // Old Claude SDK runner
 import { runClaude, type RunnerHandle } from "./libs/runner-openai.js"; // New OpenAI SDK runner
@@ -358,6 +358,11 @@ export function handleClientEvent(event: ClientEvent) {
         payload: { message: `Failed to save settings: ${error}` }
       });
     }
+    return;
+  }
+
+  if (event.type === "open.external") {
+    shell.openExternal(event.payload.url);
     return;
   }
 }

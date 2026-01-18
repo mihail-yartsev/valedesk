@@ -16,6 +16,7 @@ import { executeGlobTool } from './tools/glob-tool.js';
 import { executeGrepTool } from './tools/grep-tool.js';
 import { WebSearchTool } from './tools/web-search.js';
 import { ExtractPageContentTool } from './tools/extract-page-content.js';
+import { ZaiReaderTool } from './tools/zai-reader.js';
 import { executeMemoryTool } from './tools/memory-tool.js';
 import { executeJSTool } from './tools/execute-js-tool.js';
 import { installPackageTool } from './tools/install-package-tool.js';
@@ -27,17 +28,36 @@ export class ToolExecutor {
   private apiSettings: ApiSettings | null;
   private webSearchTool: WebSearchTool | null = null;
   private extractPageTool: ExtractPageContentTool | null = null;
+  private zaiReaderTool: ZaiReaderTool | null = null;
 
   constructor(cwd: string, apiSettings: ApiSettings | null = null) {
     // Normalize and resolve the working directory to absolute path
     // If cwd is empty or undefined, keep it empty (no workspace mode)
     this.cwd = cwd && cwd.trim() ? normalize(resolve(cwd)) : '';
     this.apiSettings = apiSettings;
-    
-    // Initialize web tools if Tavily API key is available
-    if (apiSettings?.tavilyApiKey) {
-      this.webSearchTool = new WebSearchTool(apiSettings.tavilyApiKey);
-      this.extractPageTool = new ExtractPageContentTool(apiSettings.tavilyApiKey);
+
+    // Initialize web tools based on provider and API key availability
+    const provider = apiSettings?.webSearchProvider || 'tavily';
+    const zaiApiUrl = apiSettings?.zaiApiUrl || 'default';
+    if (provider === 'tavily' && apiSettings?.tavilyApiKey) {
+      this.webSearchTool = new WebSearchTool(apiSettings.tavilyApiKey, 'tavily', 'default');
+      // Page extraction only available with Tavily
+      this.extractPageTool = new ExtractPageContentTool(apiSettings.tavilyApiKey, 'tavily');
+    } else if (provider === 'zai' && apiSettings?.zaiApiKey) {
+      this.webSearchTool = new WebSearchTool(apiSettings.zaiApiKey, 'zai', zaiApiUrl);
+      // Page extraction not available with Z.AI, leave as null
+      this.extractPageTool = null;
+    } else {
+      this.webSearchTool = null;
+      this.extractPageTool = null;
+    }
+
+    // Initialize ZaiReader if enabled and Z.AI API key is available
+    const zaiReaderApiUrl = apiSettings?.zaiReaderApiUrl || 'default';
+    if (apiSettings?.enableZaiReader && apiSettings?.zaiApiKey) {
+      this.zaiReaderTool = new ZaiReaderTool(apiSettings.zaiApiKey, zaiReaderApiUrl);
+    } else {
+      this.zaiReaderTool = null;
     }
   }
 
@@ -139,6 +159,9 @@ export class ToolExecutor {
         case 'ExtractPageContent':
           return await this.executeExtractPage(args);
         
+        case 'ZaiReader':
+          return await this.executeZaiReader(args);
+        
         case 'Memory':
           return await executeMemoryTool(args as any, context);
         
@@ -165,9 +188,11 @@ export class ToolExecutor {
 
   private async executeWebSearch(args: any): Promise<ToolResult> {
     if (!this.webSearchTool) {
+      const provider = this.apiSettings?.webSearchProvider || 'tavily';
+      const apiKeyField = provider === 'tavily' ? 'Tavily' : 'Z.AI';
       return {
         success: false,
-        error: 'Web search is not available. Please configure Tavily API key in Settings.'
+        error: `Web search is not available. Please configure ${apiKeyField} API key in Settings.`
       };
     }
 
@@ -179,7 +204,7 @@ export class ToolExecutor {
       });
 
       const formatted = this.webSearchTool.formatResults(results);
-      
+
       return {
         success: true,
         output: formatted
@@ -194,6 +219,13 @@ export class ToolExecutor {
 
   private async executeExtractPage(args: any): Promise<ToolResult> {
     if (!this.extractPageTool) {
+      const provider = this.apiSettings?.webSearchProvider || 'tavily';
+      if (provider !== 'tavily') {
+        return {
+          success: false,
+          error: 'Page extraction is only available when using Tavily as the web search provider. Please switch to Tavily in Settings to use this feature.'
+        };
+      }
       return {
         success: false,
         error: 'Page extraction is not available. Please configure Tavily API key in Settings.'
@@ -207,7 +239,7 @@ export class ToolExecutor {
       });
 
       const formatted = this.extractPageTool.formatResults(results);
-      
+
       return {
         success: true,
         output: formatted
@@ -216,6 +248,25 @@ export class ToolExecutor {
       return {
         success: false,
         error: `Page extraction failed: ${error.message}`
+      };
+    }
+  }
+
+  private async executeZaiReader(args: any): Promise<ToolResult> {
+    if (!this.zaiReaderTool) {
+      return {
+        success: false,
+        error: 'Z.AI Reader is not available. Please configure Z.AI as the web search provider and provide a valid API key in Settings.'
+      };
+    }
+
+    try {
+      const result = await this.zaiReaderTool.execute(args, this.getContext());
+      return result;
+    } catch (error: any) {
+      return {
+        success: false,
+        error: `Z.AI Reader failed: ${error.message}`
       };
     }
   }

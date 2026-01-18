@@ -117,9 +117,7 @@ export async function runClaude(options: RunnerOptions): Promise<RunnerHandle> {
 
       // Ensure baseURL ends with /v1 for OpenAI compatibility
       let baseURL = guiSettings.baseUrl;
-      if (!baseURL.endsWith('/v1')) {
-        baseURL = baseURL.replace(/\/$/, '') + '/v1';
-      }
+
 
       console.log(`[OpenAI Runner] Starting with model: ${guiSettings.model}`);
       console.log(`[OpenAI Runner] Base URL: ${baseURL}`);

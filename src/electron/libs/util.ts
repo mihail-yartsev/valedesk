@@ -84,7 +84,7 @@ export const generateSessionTitle = async (userIntent: string | null) => {
     // Create OpenAI client with user settings
     const client = new OpenAI({
       apiKey: guiSettings.apiKey,
-      baseURL: guiSettings.baseUrl ? `${guiSettings.baseUrl}/v1` : undefined,
+      baseURL: guiSettings.baseUrl ? `${guiSettings.baseUrl}` : undefined,
     });
 
     const response = await client.chat.completions.create({

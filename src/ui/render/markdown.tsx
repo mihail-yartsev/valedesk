@@ -4,6 +4,12 @@ import rehypeRaw from "rehype-raw";
 import remarkGfm from "remark-gfm";
 
 export default function MDContent({ text }: { text: string }) {
+  const handleLinkClick = (href: string) => {
+    if (href && (href.startsWith('http://') || href.startsWith('https://'))) {
+      window.electron.sendClientEvent({ type: "open.external", payload: { url: href } });
+    }
+  };
+
   return (
     <ReactMarkdown
       remarkPlugins={[remarkGfm]}
@@ -19,11 +25,15 @@ export default function MDContent({ text }: { text: string }) {
         strong: (props) => <strong className="text-ink-900 font-semibold" {...props} />,
         em: (props) => <em className="text-ink-800" {...props} />,
         a: (props) => (
-          <a 
-            className="text-accent hover:text-accent-hover underline cursor-pointer transition-colors" 
-            target="_blank" 
-            rel="noopener noreferrer"
-            {...props} 
+          <a
+            className="text-accent hover:text-accent-hover underline cursor-pointer transition-colors"
+            onClick={(e) => {
+              e.preventDefault();
+              if (props.href) {
+                handleLinkClick(props.href);
+              }
+            }}
+            {...props}
           />
         ),
         pre: (props) => (

@@ -20,7 +20,6 @@ function App() {
   const [showFileBrowser, setShowFileBrowser] = useState(false);
   const [apiSettings, setApiSettings] = useState<ApiSettings | null>(null);
   const [settingsLoaded, setSettingsLoaded] = useState(false); // Track if settings have been loaded from backend
-  const autoScrollRef = useRef(true); // Use ref for immediate access
   const partialUpdateScheduledRef = useRef(false);
 
   const sessions = useAppStore((s) => s.sessions);
@@ -38,6 +37,8 @@ function App() {
   const cwd = useAppStore((s) => s.cwd);
   const setCwd = useAppStore((s) => s.setCwd);
   const pendingStart = useAppStore((s) => s.pendingStart);
+  const autoScrollEnabled = useAppStore((s) => s.autoScrollEnabled);
+  const setAutoScrollEnabled = useAppStore((s) => s.setAutoScrollEnabled);
 
   // Helper function to extract partial message content
   const getPartialMessageContent = (eventMessage: any) => {
@@ -158,77 +159,31 @@ function App() {
   useEffect(() => {
     // Only scroll if we actually added a new message (not just updated existing ones)
     if (messages.length > prevMessagesLengthRef.current) {
-      console.log('[AutoScroll] New message detected, scrolling to bottom');
-      // Always scroll to bottom when new message arrives
-      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-      autoScrollRef.current = true; // Re-enable auto-scroll
+      console.log('[AutoScroll] New message detected, autoScrollEnabled:', autoScrollEnabled);
+      if (autoScrollEnabled) {
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+      }
       prevMessagesLengthRef.current = messages.length;
     }
-  }, [messages]);
+  }, [messages, autoScrollEnabled]);
 
-  // Auto-scroll during streaming - ONLY if user is at bottom
+  // Auto-scroll during streaming - ONLY if autoScrollEnabled is true
   const lastScrollTimeRef = useRef<number>(0);
-  
+
   useEffect(() => {
-    if (!showPartialMessage || !partialMessage) return;
-    
-    // Check if user is still at bottom before scrolling
+    if (!showPartialMessage || !partialMessage || !autoScrollEnabled) return;
+
     const messagesContainer = document.querySelector('.overflow-y-auto');
     if (!messagesContainer) return;
-    
-    const { scrollHeight, scrollTop, clientHeight } = messagesContainer;
-    const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
-    const isNearBottom = distanceFromBottom < 300; // Increased threshold for long messages
-    
-    // Update ref in real-time
-    autoScrollRef.current = isNearBottom;
-    
-    // Only scroll if user is near bottom
-    if (autoScrollRef.current) {
-      const now = Date.now();
-      // Throttle scroll calls to max once per 30ms for more responsive scrolling
-      if (now - lastScrollTimeRef.current > 30) {
-        lastScrollTimeRef.current = now;
-        // Force scroll to bottom immediately for long messages
-        messagesContainer.scrollTop = messagesContainer.scrollHeight;
-      }
+
+    const now = Date.now();
+    // Throttle scroll calls to max once per 30ms for more responsive scrolling
+    if (now - lastScrollTimeRef.current > 30) {
+      lastScrollTimeRef.current = now;
+      // Force scroll to bottom immediately for long messages
+      messagesContainer.scrollTop = messagesContainer.scrollHeight;
     }
-  }, [showPartialMessage, partialMessage]);
-
-  // Track user scroll to enable/disable auto-scroll
-  useEffect(() => {
-    const messagesContainer = document.querySelector('.overflow-y-auto');
-    if (!messagesContainer) {
-      console.warn('[AutoScroll] Messages container not found');
-      return;
-    }
-
-    const handleScroll = () => {
-      const { scrollHeight, scrollTop, clientHeight } = messagesContainer;
-      const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
-      const isNearBottom = distanceFromBottom < 300; // Increased threshold for long messages
-      
-      // Debug logging
-      if (autoScrollRef.current !== isNearBottom) {
-        console.log('[AutoScroll] Changed:', { 
-          isNearBottom, 
-          distanceFromBottom,
-          scrollTop,
-          scrollHeight,
-          clientHeight
-        });
-      }
-      
-      autoScrollRef.current = isNearBottom;
-    };
-
-    messagesContainer.addEventListener('scroll', handleScroll, { passive: true });
-    
-    // Initial check
-    handleScroll();
-    
-    return () => messagesContainer.removeEventListener('scroll', handleScroll);
-  }, []);
+  }, [showPartialMessage, partialMessage, autoScrollEnabled]);
 
   const handleNewSession = useCallback(() => {
     useAppStore.getState().setActiveSessionId(null);
@@ -297,6 +252,22 @@ function App() {
           </div>
           <span className="text-sm font-medium text-ink-700">{activeSession?.title || "LocalDesk"}</span>
           <div className="flex items-center gap-2">
+            {/* Auto scroll toggle */}
+            <button
+              onClick={() => setAutoScrollEnabled(!autoScrollEnabled)}
+              className={`flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors ${
+                autoScrollEnabled
+                  ? 'bg-info/10 border-info/30 text-info'
+                  : 'bg-ink-900/5 border-ink-900/10 text-ink-500'
+              }`}
+              style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+              title={autoScrollEnabled ? 'Auto scroll enabled' : 'Auto scroll disabled'}
+            >
+              <svg className={`w-4 h-4 transition-transform ${autoScrollEnabled ? 'text-info' : 'text-ink-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+              </svg>
+              <span>Auto Scroll</span>
+            </button>
             {!activeSession?.cwd && activeSessionId && (
               <button
                 onClick={async () => {
@@ -368,7 +339,7 @@ function App() {
         </div>
 
         <div className="flex-1 overflow-y-auto px-8 pb-40 pt-6">
-          <div className="mx-auto max-w-3xl">
+          <div className="mx-auto w-full">
             {messages.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-20 text-center">
                 <div className="text-lg font-medium text-ink-700">No messages yet</div>

@@ -1,9 +1,10 @@
 /**
- * WebSearchTool - Search the web using Tavily API
+ * WebSearchTool - Search the web using Tavily or Z.AI API
  */
 
 import { tavily } from '@tavily/core';
 import type { ToolDefinition, ToolResult, ToolExecutionContext } from './base-tool.js';
+import type { WebSearchProvider } from '../../types.js';
 
 export interface WebSearchParams {
   query: string;
@@ -46,7 +47,10 @@ export const WebSearchToolDefinition: ToolDefinition = {
   }
 };
 
-export class WebSearchTool {
+/**
+ * Tavily-based web search
+ */
+class TavilyWebSearch {
   private tvly: any;
 
   constructor(apiKey: string) {
@@ -59,7 +63,7 @@ export class WebSearchTool {
   async search(params: WebSearchParams): Promise<SearchResult[]> {
     const { query, max_results = 5 } = params;
 
-    console.log(`[WebSearch] Query: "${query}", max_results: ${max_results}`);
+    console.log(`[TavilyWebSearch] Query: "${query}", max_results: ${max_results}`);
 
     try {
       const response = await this.tvly.search(query, {
@@ -75,13 +79,106 @@ export class WebSearchTool {
         score: result.score,
       }));
 
-      console.log(`[WebSearch] Found ${results.length} results`);
+      console.log(`[TavilyWebSearch] Found ${results.length} results`);
       return results;
 
     } catch (error) {
-      console.error('[WebSearch] Error:', error);
+      console.error('[TavilyWebSearch] Error:', error);
       throw error;
     }
+  }
+}
+
+/**
+ * Z.AI-based web search
+ */
+class ZaiWebSearch {
+  private apiKey: string;
+  private baseUrl: string;
+
+  constructor(apiKey: string, zaiApiUrl: 'default' | 'coding' = 'default') {
+    if (!apiKey || apiKey === 'dummy-key') {
+      throw new Error('Z.AI API key not configured. Please set it in Settings.');
+    }
+    this.apiKey = apiKey;
+    // Set base URL based on zaiApiUrl variant
+    if (zaiApiUrl === 'coding') {
+      this.baseUrl = 'https://api.z.ai/api/coding';
+    } else {
+      this.baseUrl = 'https://api.z.ai/api';
+    }
+    console.log(`[ZaiWebSearch] Using API URL: ${this.baseUrl}`);
+  }
+
+  async search(params: WebSearchParams): Promise<SearchResult[]> {
+    const { query, max_results = 5 } = params;
+
+    console.log(`[ZaiWebSearch] Query: "${query}", max_results: ${max_results}`);
+
+    try {
+      const response = await fetch(`${this.baseUrl}/paas/v4/web_search`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${this.apiKey}`,
+          'Accept-Language': 'en-US,en'
+        },
+        body: JSON.stringify({
+          search_engine: 'search-prime',
+          search_query: query,
+          count: Math.min(max_results, 50)
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(`Z.AI API error: ${response.status} ${JSON.stringify(errorData)}`);
+      }
+
+      const data = await response.json();
+
+      const results: SearchResult[] = (data.search_result || []).map((result: any) => ({
+        title: result.title || '',
+        url: result.link || '',
+        snippet: result.content || result.title || '',
+      }));
+
+      console.log(`[ZaiWebSearch] Found ${results.length} results`);
+      return results;
+
+    } catch (error) {
+      console.error('[ZaiWebSearch] Error:', error);
+      throw error;
+    }
+  }
+}
+
+/**
+ * Main WebSearchTool class that supports multiple providers
+ */
+export class WebSearchTool {
+  private searchProvider: TavilyWebSearch | ZaiWebSearch | null = null;
+
+  constructor(apiKey: string, provider: WebSearchProvider = 'tavily', zaiApiUrl: 'default' | 'coding' = 'default') {
+    if (!apiKey || apiKey === 'dummy-key') {
+      throw new Error('API key not configured. Please set it in Settings.');
+    }
+
+    if (provider === 'tavily') {
+      this.searchProvider = new TavilyWebSearch(apiKey);
+    } else if (provider === 'zai') {
+      this.searchProvider = new ZaiWebSearch(apiKey, zaiApiUrl);
+    } else {
+      throw new Error(`Unknown web search provider: ${provider}`);
+    }
+  }
+
+  async search(params: WebSearchParams): Promise<SearchResult[]> {
+    if (!this.searchProvider) {
+      throw new Error('Web search provider not initialized');
+    }
+
+    return this.searchProvider.search(params);
   }
 
   formatResults(results: SearchResult[]): string {

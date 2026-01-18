@@ -32,6 +32,7 @@ interface AppState {
   sessionsLoaded: boolean;
   showStartModal: boolean;
   historyRequested: Set<string>;
+  autoScrollEnabled: boolean;
 
   setPrompt: (prompt: string) => void;
   setCwd: (cwd: string) => void;
@@ -43,6 +44,7 @@ interface AppState {
   resolvePermissionRequest: (sessionId: string, toolUseId: string) => void;
   sendEvent: (event: any) => void;
   handleServerEvent: (event: ServerEvent) => void;
+  setAutoScrollEnabled: (enabled: boolean) => void;
 }
 
 function createSession(id: string): SessionView {
@@ -59,6 +61,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   sessionsLoaded: false,
   showStartModal: false,
   historyRequested: new Set(),
+  autoScrollEnabled: true,
 
   setPrompt: (prompt) => set({ prompt }),
   setCwd: (cwd) => set({ cwd }),
@@ -66,6 +69,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   setGlobalError: (globalError) => set({ globalError }),
   setShowStartModal: (showStartModal) => set({ showStartModal }),
   setActiveSessionId: (id) => set({ activeSessionId: id }),
+  setAutoScrollEnabled: (autoScrollEnabled) => set({ autoScrollEnabled }),
   sendEvent: (event) => {
     window.electron.sendClientEvent(event);
   },

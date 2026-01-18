@@ -11,14 +11,25 @@ export type ClaudeSettingsEnv = {
   CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: string;
 };
 
+export type WebSearchProvider = 'tavily' | 'zai';
+
+export type ZaiApiUrl = 'default' | 'coding';
+
+export type ZaiReaderApiUrl = 'default' | 'coding';
+
 export type ApiSettings = {
   apiKey: string;
   baseUrl: string;
   model: string;
   temperature?: number;  // Optional temperature for vLLM/OpenAI-compatible APIs
   tavilyApiKey?: string; // Optional Tavily API key for web search
+  zaiApiKey?: string; // Optional Z.AI API key for web search
+  webSearchProvider?: WebSearchProvider; // Web search provider: 'tavily' or 'zai'
+  zaiApiUrl?: ZaiApiUrl; // Z.AI API URL variant: 'default' or 'coding'
   permissionMode?: 'default' | 'ask'; // Permission mode: 'default' = auto-execute, 'ask' = require confirmation
   enableMemory?: boolean; // Enable long-term memory tool
+  enableZaiReader?: boolean; // Enable Z.AI Web Reader tool
+  zaiReaderApiUrl?: ZaiReaderApiUrl; // Z.AI Reader API URL variant: 'default' or 'coding'
 };
 
 export type UserPromptMessage = {
@@ -66,4 +77,5 @@ export type ClientEvent =
   | { type: "permission.response"; payload: { sessionId: string; toolUseId: string; result: PermissionResult } }
   | { type: "message.edit"; payload: { sessionId: string; messageIndex: number; newPrompt: string } }
   | { type: "settings.get" }
-  | { type: "settings.save"; payload: { settings: ApiSettings } };
+  | { type: "settings.save"; payload: { settings: ApiSettings } }
+  | { type: "open.external"; payload: { url: string } };

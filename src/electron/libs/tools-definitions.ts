@@ -8,11 +8,19 @@ import type { ApiSettings } from '../types.js';
 
 // Get tools based on settings
 export function getTools(settings: ApiSettings | null) {
+  let tools = ALL_TOOL_DEFINITIONS;
+  
+  // Filter out Memory tool if not enabled
   if (!settings?.enableMemory) {
-    // Filter out Memory tool if not enabled
-    return ALL_TOOL_DEFINITIONS.filter(tool => tool.function.name !== 'Memory');
+    tools = tools.filter(tool => tool.function.name !== 'Memory');
   }
-  return ALL_TOOL_DEFINITIONS;
+  
+  // Filter out ZaiReader if not enabled or Z.AI API key not provided
+  if (!settings?.enableZaiReader || !settings?.zaiApiKey) {
+    tools = tools.filter(tool => tool.function.name !== 'ZaiReader');
+  }
+  
+  return tools;
 }
 
 // Export all tools (for backward compatibility)

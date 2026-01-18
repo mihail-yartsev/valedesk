@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
-import type { ApiSettings } from "../types";
+import type { ApiSettings, WebSearchProvider, ZaiApiUrl, ZaiReaderApiUrl } from "../types";
 
 type SettingsModalProps = {
   onClose: () => void;
@@ -14,12 +14,18 @@ export function SettingsModal({ onClose, onSave, currentSettings }: SettingsModa
   const [model, setModel] = useState(currentSettings?.model || "");
   const [temperature, setTemperature] = useState(currentSettings?.temperature?.toString() || "0.3");
   const [tavilyApiKey, setTavilyApiKey] = useState(currentSettings?.tavilyApiKey || "");
+  const [zaiApiKey, setZaiApiKey] = useState(currentSettings?.zaiApiKey || "");
+  const [webSearchProvider, setWebSearchProvider] = useState<WebSearchProvider>(currentSettings?.webSearchProvider || 'tavily');
+  const [zaiApiUrl, setZaiApiUrl] = useState<ZaiApiUrl>(currentSettings?.zaiApiUrl || 'default');
   const [permissionMode, setPermissionMode] = useState<'default' | 'ask'>(currentSettings?.permissionMode || 'ask');
   const [enableMemory, setEnableMemory] = useState(currentSettings?.enableMemory || false);
+  const [enableZaiReader, setEnableZaiReader] = useState(currentSettings?.enableZaiReader || false);
+  const [zaiReaderApiUrl, setZaiReaderApiUrl] = useState<ZaiReaderApiUrl>(currentSettings?.zaiReaderApiUrl || 'default');
   const [memoryContent, setMemoryContent] = useState("");
   const [memoryLoading, setMemoryLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showTavilyPassword, setShowTavilyPassword] = useState(false);
+  const [showZaiPassword, setShowZaiPassword] = useState(false);
 
   useEffect(() => {
     if (currentSettings) {
@@ -28,8 +34,13 @@ export function SettingsModal({ onClose, onSave, currentSettings }: SettingsModa
       setModel(currentSettings.model || "");
       setTemperature(currentSettings.temperature?.toString() || "0.3");
       setTavilyApiKey(currentSettings.tavilyApiKey || "");
+      setZaiApiKey(currentSettings.zaiApiKey || "");
+      setWebSearchProvider(currentSettings.webSearchProvider || 'tavily');
+      setZaiApiUrl(currentSettings.zaiApiUrl || 'default');
       setPermissionMode(currentSettings.permissionMode || 'ask');
       setEnableMemory(currentSettings.enableMemory || false);
+      setEnableZaiReader(currentSettings.enableZaiReader || false);
+      setZaiReaderApiUrl(currentSettings.zaiReaderApiUrl || 'default');
     }
   }, [currentSettings]);
 
@@ -75,8 +86,13 @@ export function SettingsModal({ onClose, onSave, currentSettings }: SettingsModa
       model: model.trim(),
       temperature: !isNaN(tempValue) ? tempValue : 0.3,
       tavilyApiKey: tavilyApiKey.trim() || undefined,
+      zaiApiKey: zaiApiKey.trim() || undefined,
+      webSearchProvider,
+      zaiApiUrl,
       permissionMode,
-      enableMemory
+      enableMemory,
+      enableZaiReader,
+      zaiReaderApiUrl
     });
     onClose();
   };
@@ -87,8 +103,13 @@ export function SettingsModal({ onClose, onSave, currentSettings }: SettingsModa
     setModel("");
     setTemperature("0.3");
     setTavilyApiKey("");
+    setZaiApiKey("");
+    setWebSearchProvider('tavily');
+    setZaiApiUrl('default');
     setPermissionMode('ask');
     setEnableMemory(false);
+    setEnableZaiReader(false);
+    setZaiReaderApiUrl('default');
   };
 
   return (
@@ -181,38 +202,152 @@ export function SettingsModal({ onClose, onSave, currentSettings }: SettingsModa
 
             <div className="border-t border-ink-900/10 pt-4">
               <label className="block text-sm font-medium text-ink-700 mb-2">
-                Tavily API Key (Optional)
-                <span className="ml-2 text-xs font-normal text-ink-500">For web search</span>
+                Web Search Provider
+                <span className="ml-2 text-xs font-normal text-ink-500">Select search engine for web search</span>
               </label>
-              <div className="relative">
-                <input
-                  type={showTavilyPassword ? "text" : "password"}
-                  value={tavilyApiKey}
-                  onChange={(e) => setTavilyApiKey(e.target.value)}
-                  placeholder="tvly-... (optional)"
-                  className="w-full px-4 py-2.5 pr-10 text-sm border border-ink-900/20 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-ink-900/20 transition-all"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowTavilyPassword(!showTavilyPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-500 hover:text-ink-700"
-                >
-                  {showTavilyPassword ? (
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
-                    </svg>
-                  ) : (
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                    </svg>
-                  )}
-                </button>
-              </div>
-              <p className="mt-1 text-xs text-ink-500">
-                Get your API key at <a href="https://tavily.com" target="_blank" rel="noopener noreferrer" className="text-ink-700 hover:underline">tavily.com</a>
-              </p>
+              <select
+                value={webSearchProvider}
+                onChange={(e) => setWebSearchProvider(e.target.value as WebSearchProvider)}
+                className="w-full px-4 py-2.5 text-sm border border-ink-900/20 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-ink-900/20 transition-all"
+              >
+                <option value="tavily">Tavily</option>
+                <option value="zai">Z.AI</option>
+              </select>
             </div>
+
+            {webSearchProvider === 'tavily' && (
+              <div>
+                <label className="block text-sm font-medium text-ink-700 mb-2">
+                  Tavily API Key
+                </label>
+                <div className="relative">
+                  <input
+                    type={showTavilyPassword ? "text" : "password"}
+                    value={tavilyApiKey}
+                    onChange={(e) => setTavilyApiKey(e.target.value)}
+                    placeholder="tvly-... (optional)"
+                    className="w-full px-4 py-2.5 pr-10 text-sm border border-ink-900/20 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-ink-900/20 transition-all"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowTavilyPassword(!showTavilyPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-500 hover:text-ink-700"
+                  >
+                    {showTavilyPassword ? (
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                      </svg>
+                    ) : (
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                      </svg>
+                    )}
+                  </button>
+                </div>
+                <p className="mt-1 text-xs text-ink-500">
+                  Get your API key at <a href="https://tavily.com" target="_blank" rel="noopener noreferrer" className="text-ink-700 hover:underline">tavily.com</a>
+                </p>
+              </div>
+            )}
+
+            {webSearchProvider === 'zai' && (
+              <div>
+                <label className="block text-sm font-medium text-ink-700 mb-2">
+                  Z.AI API Key
+                </label>
+                <div className="relative">
+                  <input
+                    type={showZaiPassword ? "text" : "password"}
+                    value={zaiApiKey}
+                    onChange={(e) => setZaiApiKey(e.target.value)}
+                    placeholder="zai-... (optional)"
+                    className="w-full px-4 py-2.5 pr-10 text-sm border border-ink-900/20 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-ink-900/20 transition-all"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowZaiPassword(!showZaiPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-500 hover:text-ink-700"
+                  >
+                    {showZaiPassword ? (
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                      </svg>
+                    ) : (
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                      </svg>
+                    )}
+                  </button>
+                </div>
+                <p className="mt-1 text-xs text-ink-500">
+                  Get your API key at <a href="https://chat.z.ai/manage-apikey/apikey-list" target="_blank" rel="noopener noreferrer" className="text-ink-700 hover:underline">chat.z.ai</a>
+                </p>
+              </div>
+            )}
+
+            {webSearchProvider === 'zai' && (
+              <div>
+                <label className="block text-sm font-medium text-ink-700 mb-2">
+                  Z.AI API URL
+                  <span className="ml-2 text-xs font-normal text-ink-500">Select API endpoint variant</span>
+                </label>
+                <select
+                  value={zaiApiUrl}
+                  onChange={(e) => setZaiApiUrl(e.target.value as ZaiApiUrl)}
+                  className="w-full px-4 py-2.5 text-sm border border-ink-900/20 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-ink-900/20 transition-all"
+                >
+                  <option value="default">Default (https://api.z.ai/api/paas/v4/web_search)</option>
+                  <option value="coding">Coding (https://api.z.ai/api/coding/paas/v4/web_search)</option>
+                </select>
+              </div>
+            )}
+
+            <div className="border-t border-ink-900/10 pt-4">
+              <label className="block text-sm font-medium text-ink-700 mb-2">
+                Web Page Reader
+              </label>
+              <label className="flex items-center justify-between cursor-pointer">
+                <div className="flex-1">
+                  <span className="block text-sm font-medium text-ink-700">Enable Z.AI Reader</span>
+                  <p className="mt-1 text-xs text-ink-500">
+                    Use Z.AI API to read and parse web page content
+                  </p>
+                </div>
+                <div className="relative">
+                  <input
+                    type="checkbox"
+                    checked={enableZaiReader}
+                    onChange={(e) => setEnableZaiReader(e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-ink-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-accent/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-ink-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-accent"></div>
+                </div>
+              </label>
+            </div>
+
+            {enableZaiReader && (
+              <div>
+                <label className="block text-sm font-medium text-ink-700 mb-2">
+                  Z.AI Reader API URL
+                  <span className="ml-2 text-xs font-normal text-ink-500">Select reader API endpoint variant</span>
+                </label>
+                <select
+                  value={zaiReaderApiUrl}
+                  onChange={(e) => setZaiReaderApiUrl(e.target.value as ZaiReaderApiUrl)}
+                  className="w-full px-4 py-2.5 text-sm border border-ink-900/20 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-ink-900/20 transition-all"
+                >
+                  <option value="default">Default (https://api.z.ai/api/paas/v4/reader)</option>
+                  <option value="coding">Coding (https://api.z.ai/api/coding/paas/v4/reader)</option>
+                </select>
+                {!zaiApiKey && (
+                  <p className="mt-1 text-xs text-amber-600">
+                    Warning: Z.AI API Key is required for reader to work. Add it in Web Search section.
+                  </p>
+                )}
+              </div>
+            )}
 
             <div>
               <label className="block text-sm font-medium text-ink-700 mb-2">

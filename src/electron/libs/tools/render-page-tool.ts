@@ -449,6 +449,23 @@ export async function executeRenderPageTool(
     // Wait for JS to execute
     await new Promise(resolve => setTimeout(resolve, waitTime));
     
+    // For Telegram: scroll to load more posts if needed
+    if (isTelegram && effectiveMaxPosts > 5) {
+      console.log(`[render_page] Telegram: scrolling to load more posts (target: ${effectiveMaxPosts})...`);
+      
+      // Scroll up multiple times to load more posts
+      const scrollIterations = Math.ceil(effectiveMaxPosts / 5);
+      for (let i = 0; i < scrollIterations; i++) {
+        await renderWindow.webContents.executeJavaScript(`
+          window.scrollTo(0, 0);
+        `);
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+      
+      // Wait for posts to load
+      await new Promise(resolve => setTimeout(resolve, 2000));
+    }
+    
     // Choose extraction script based on URL type
     let extractScript: string;
     

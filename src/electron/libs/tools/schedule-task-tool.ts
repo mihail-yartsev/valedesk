@@ -193,13 +193,7 @@ export class ScheduleTaskTool extends BaseTool {
 
     return {
       success: true,
-      output: `✅ Task created successfully
-ID: ${taskId}
-Title: ${params.title}
-Schedule: ${params.schedule}
-Next run: ${new Date(nextRun).toLocaleString()}
-${params.prompt ? `Prompt: ${params.prompt.substring(0, 50)}${params.prompt.length > 50 ? '...' : ''}` : 'No prompt (reminder only)'}
-${params.notifyBefore ? `Notification: ${params.notifyBefore} minutes before` : ''}`
+      output: `✅ Reminder set for ${new Date(nextRun).toLocaleString()}`
     };
   }
 

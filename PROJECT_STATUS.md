@@ -10,42 +10,47 @@ LocalDesk is a fully functional desktop AI assistant with local model support. T
 ## ✅ Implemented Features
 
 ### Core System
+
 - [x] OpenAI SDK integration (compatible with any OpenAI-compatible API)
 - [x] Streaming responses with optimized UI updates (60fps)
 - [x] Session management with SQLite persistence
 - [x] Cross-platform support (Windows, macOS, Linux)
 
 ### Tool System (12 tools)
+
 All tools follow `snake_case` naming convention (`verb_noun` pattern):
 
-| Category | Tool | Status | Description |
-|----------|------|--------|-------------|
-| **File** | `run_command` | ✅ | Shell commands |
-| **File** | `read_file` | ✅ | Read text files |
-| **File** | `write_file` | ✅ | Create files |
-| **File** | `edit_file` | ✅ | Modify files |
-| **Search** | `search_files` | ✅ | Glob patterns |
-| **Search** | `search_text` | ✅ | Text search (grep) |
-| **Code** | `execute_js` | ✅ | WASM sandbox (QuickJS) |
-| **Docs** | `read_document` | ✅ | PDF/DOCX extraction |
-| **Web** | `search_web` | ✅ | Internet search |
-| **Web** | `extract_page` | ✅ | Page extraction (Tavily) |
-| **Web** | `read_page` | ✅ | Page reader (Z.AI) |
-| **Memory** | `manage_memory` | ✅ | Persistent storage |
+| Category   | Tool            | Status | Description              |
+| ---------- | --------------- | ------ | ------------------------ |
+| **File**   | `run_command`   | ✅     | Shell commands           |
+| **File**   | `read_file`     | ✅     | Read text files          |
+| **File**   | `write_file`    | ✅     | Create files             |
+| **File**   | `edit_file`     | ✅     | Modify files             |
+| **Search** | `search_files`  | ✅     | Glob patterns            |
+| **Search** | `search_text`   | ✅     | Text search (grep)       |
+| **Code**   | `execute_js`    | ✅     | WASM sandbox (QuickJS)   |
+| **Docs**   | `read_document` | ✅     | PDF/DOCX extraction      |
+| **Web**    | `search_web`    | ✅     | Internet search          |
+| **Web**    | `extract_page`  | ✅     | Page extraction (Tavily) |
+| **Web**    | `read_page`     | ✅     | Page reader (Z.AI)       |
+| **Memory** | `manage_memory` | ✅     | Persistent storage       |
 
 ### Sandbox System
+
 - [x] **QuickJS WASM** — secure JavaScript execution
 - [x] **No external dependencies** — works out of the box from DMG
 - [x] Available APIs: `fs`, `path`, `console`, `JSON`, `Math`, `Date`, `__dirname`
 - [x] Path sandboxing — can only access workspace folder
 
 ### Document Support
+
 - [x] **PDF extraction** — using bundled `pdf-parse`
 - [x] **DOCX extraction** — using bundled `mammoth`
 - [x] **Size limits** — max 10MB per file
 - [x] **Scanned PDF detection** — warns user about OCR
 
 ### Performance Optimizations
+
 - [x] **Streaming UI** — requestAnimationFrame throttling
 - [x] **Store optimization** — stream events don't trigger state updates
 - [x] **Memory efficient** — no full chunk collection during streaming
@@ -53,16 +58,16 @@ All tools follow `snake_case` naming convention (`verb_noun` pattern):
 
 ## 🔧 Technical Stack
 
-| Component | Technology |
-|-----------|------------|
-| Frontend | React 18 + TypeScript |
-| State | Zustand |
-| Desktop | Electron 32 |
-| Database | better-sqlite3 |
+| Component  | Technology                |
+| ---------- | ------------------------- |
+| Frontend   | React 18 + TypeScript     |
+| State      | Zustand                   |
+| Desktop    | Electron 32               |
+| Database   | better-sqlite3            |
 | JS Sandbox | quickjs-emscripten (WASM) |
-| PDF | pdf-parse |
-| DOCX | mammoth |
-| Build | Vite + electron-builder |
+| PDF        | pdf-parse                 |
+| DOCX       | mammoth                   |
+| Build      | Vite + electron-builder   |
 
 ## 📁 Key Files
 
@@ -99,12 +104,11 @@ src/electron/libs/
 
 ### 🔥 High Priority Ideas
 
-- [ ] **Scheduler Tool** (`schedule_task`) — агент может ставить отложенные задачи:
+- [x] **Scheduler Tool** (`schedule_task`) — агент может ставить отложенные задачи:
   - Напоминания с уведомлениями (Electron Notification API)
   - Автоматические действия (запуск промпта по расписанию)
   - Интервалы: 1m, 10m, 1h, 1d или конкретное время
   - Пример: "Каждый день в 9:00 собери сводку новостей про AI"
-  
 - [ ] **render_page improvements** — уже реализован базовый Telegram парсинг
 
 ### 📋 Backlog
@@ -128,4 +132,4 @@ src/electron/libs/
 
 ---
 
-*This document reflects the current state of the project. For detailed changes, see [CHANGELOG.md](CHANGELOG.md).*
+_This document reflects the current state of the project. For detailed changes, see [CHANGELOG.md](CHANGELOG.md)._

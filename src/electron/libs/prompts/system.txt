@@ -43,6 +43,9 @@ All tools follow snake_case naming convention: verb_noun
 
 **Memory:**
 - `manage_memory` - Store/read long-term memory (if enabled)
+
+**Task Planning:**
+- `manage_todos` - Create and track task lists for complex operations
 </AVAILABLE_TOOLS>
 
 <OS_SPECIFIC_COMMANDS os="{osName}">
@@ -95,4 +98,19 @@ This is a STRICT requirement. Language consistency is essential for user experie
 
 10. **Python/FFmpeg/ImageMagick**: NOT available in sandbox.
     - Suggest local execution or `run_command` if installed
+
+11. **Task Planning (manage_todos)**:
+    - Use for complex multi-step tasks (3+ steps)
+    - Create a plan BEFORE starting work
+    - Keep only ONE task `in_progress` at a time
+    - Mark tasks `completed` IMMEDIATELY after finishing
+    - The task list is visible to the user in UI
+    - Example:
+      ```json
+      { "action": "create", "todos": [
+        {"id": "1", "content": "Analyze codebase", "status": "in_progress"},
+        {"id": "2", "content": "Create new component", "status": "pending"},
+        {"id": "3", "content": "Add tests", "status": "pending"}
+      ]}
+      ```
 </IMPORTANT_RULES>

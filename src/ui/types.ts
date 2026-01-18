@@ -9,6 +9,14 @@ export type StreamMessage = SDKMessage | UserPromptMessage;
 
 export type SessionStatus = "idle" | "running" | "completed" | "error";
 
+// Todo types
+export type TodoStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled';
+export interface TodoItem {
+  id: string;
+  content: string;
+  status: TodoStatus;
+}
+
 export type SessionInfo = {
   id: string;
   title: string;
@@ -61,7 +69,8 @@ export type ServerEvent =
   | { type: "runner.error"; payload: { sessionId?: string; message: string } }
   | { type: "settings.loaded"; payload: { settings: ApiSettings | null } }
   | { type: "models.loaded"; payload: { models: ModelInfo[] } }
-  | { type: "models.error"; payload: { message: string } };
+  | { type: "models.error"; payload: { message: string } }
+  | { type: "todos.updated"; payload: { sessionId: string; todos: TodoItem[] } };
 
 // Client -> Server events
 export type ClientEvent =

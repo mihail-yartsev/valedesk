@@ -76,9 +76,9 @@ export const generateSessionTitle = async (userIntent: string | null) => {
     // Load GUI settings with priority
     const guiSettings = loadApiSettings();
     
-    // If no valid settings, use simple title
+    // If no valid settings, use simple fallback
     if (!guiSettings || !guiSettings.apiKey) {
-      return userIntent.slice(0, 50) + (userIntent.length > 50 ? '...' : '');
+      return extractFallbackTitle(userIntent);
     }
     
     // Create OpenAI client with user settings
@@ -91,23 +91,73 @@ export const generateSessionTitle = async (userIntent: string | null) => {
       model: guiSettings.model || 'gpt-3.5-turbo',
       messages: [
         {
+          role: 'system',
+          content: `You are a chat title generator. Generate a SHORT title (1-2 words MAX) that captures the essence of the user's request. 
+
+Rules:
+- Output ONLY the title, nothing else
+- Maximum 2 words
+- No quotes, no punctuation
+- Use nouns or noun+verb format
+- Examples: "File Analysis", "Code Review", "Python Help", "Web Parsing"`
+        },
+        {
           role: 'user',
-          content: `Generate a short title (max 50 chars) for this conversation. Only output the title, nothing else:\n\n${userIntent}`
+          content: userIntent
         }
       ],
-      max_tokens: 50,
+      max_tokens: 10,
       temperature: 0.3,
     });
 
     const title = response.choices[0]?.message?.content?.trim();
     if (title) {
-      // Clean up the title - remove quotes if present
-      return title.replace(/^["']|["']$/g, '').slice(0, 50);
+      // Clean up: remove quotes, limit to 2 words, max 30 chars
+      const cleaned = title
+        .replace(/^["']|["']$/g, '')
+        .replace(/[.,!?:;]/g, '')
+        .split(/\s+/)
+        .slice(0, 2)
+        .join(' ')
+        .slice(0, 30);
+      
+      if (cleaned.length > 0) {
+        return cleaned;
+      }
     }
   } catch (error) {
     console.error('Failed to generate session title:', error);
   }
 
-  // Fallback: use first 50 chars of user input
-  return userIntent.slice(0, 50) + (userIntent.length > 50 ? '...' : '');
+  // Fallback: extract key words from user input
+  return extractFallbackTitle(userIntent);
 };
+
+/**
+ * Extract a simple title from user input when LLM is not available
+ */
+function extractFallbackTitle(text: string): string {
+  // Remove common words and extract first meaningful words
+  const stopWords = new Set(['a', 'an', 'the', 'is', 'are', 'was', 'were', 'be', 'been', 'being', 
+    'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could', 'should', 'may', 'might',
+    'to', 'of', 'in', 'for', 'on', 'with', 'at', 'by', 'from', 'as', 'into', 'through',
+    'and', 'or', 'but', 'if', 'then', 'else', 'when', 'where', 'why', 'how', 'what', 'which',
+    'this', 'that', 'these', 'those', 'it', 'its', 'i', 'me', 'my', 'we', 'our', 'you', 'your',
+    'please', 'can', 'need', 'want', 'help', 'make', 'get', 'show', 'tell']);
+  
+  const words = text
+    .toLowerCase()
+    .replace(/[^\w\sа-яё]/gi, ' ')
+    .split(/\s+/)
+    .filter(w => w.length > 2 && !stopWords.has(w))
+    .slice(0, 2);
+  
+  if (words.length === 0) {
+    return "New Chat";
+  }
+  
+  // Capitalize first letter of each word
+  return words
+    .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ');
+}

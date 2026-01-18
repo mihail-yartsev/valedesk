@@ -97,12 +97,26 @@ src/electron/libs/
 
 ## 🔜 Potential Future Work
 
+### 🔥 High Priority Ideas
+
+- [ ] **Scheduler Tool** (`schedule_task`) — агент может ставить отложенные задачи:
+  - Напоминания с уведомлениями (Electron Notification API)
+  - Автоматические действия (запуск промпта по расписанию)
+  - Интервалы: 1m, 10m, 1h, 1d или конкретное время
+  - Пример: "Каждый день в 9:00 собери сводку новостей про AI"
+  
+- [ ] **render_page improvements** — уже реализован базовый Telegram парсинг
+
+### 📋 Backlog
+
 - [ ] Docker-based code execution for Python/Go/Rust
 - [ ] Apple Container support (when macOS 26 releases)
 - [ ] Image processing via ImageMagick
 - [ ] Video conversion via FFmpeg
 - [ ] Multi-file code editing
 - [ ] Git integration
+- [ ] MCP (Model Context Protocol) support
+- [ ] Voice input/output
 
 ## 📝 Recent Changes (v0.0.5)
 

@@ -4,6 +4,7 @@ import type { ClientEvent, ServerEvent } from "./types.js";
 import { runClaude, type RunnerHandle } from "./libs/runner-openai.js"; // New OpenAI SDK runner
 import { SessionStore } from "./libs/session-store.js";
 import { loadApiSettings, saveApiSettings } from "./libs/settings-store.js";
+import { generateSessionTitle } from "./libs/util.js";
 import { app } from "electron";
 import { join } from "path";
 import { sessionManager } from "./session-manager.js";
@@ -78,7 +79,7 @@ export function handleClientEvent(event: ClientEvent, windowId: number) {
     // Subscribe this window to the session
     sessionManager.setWindowSession(windowId, sessionId);
 
-    // Send history only to this window
+    // Send history only to this window (including todos)
     sessionManager.emitToWindow(windowId, {
       type: "session.history",
       payload: {
@@ -86,7 +87,8 @@ export function handleClientEvent(event: ClientEvent, windowId: number) {
         status: history.session.status,
         messages: history.messages,
         inputTokens: history.session.inputTokens,
-        outputTokens: history.session.outputTokens
+        outputTokens: history.session.outputTokens,
+        todos: history.todos || []
       }
     });
     return;
@@ -126,7 +128,8 @@ export function handleClientEvent(event: ClientEvent, windowId: number) {
       payload: { sessionId: session.id, status: "running", title: session.title, cwd: session.cwd }
     });
 
-    sessionManager.emitToWindow(windowId, {
+    // Use emit() to save user_prompt to DB AND send to UI
+    emit({
       type: "stream.user_prompt",
       payload: { sessionId: session.id, prompt: event.payload.prompt }
     });
@@ -176,14 +179,34 @@ export function handleClientEvent(event: ClientEvent, windowId: number) {
 
     // If session has no claudeSessionId yet (was created empty), treat this as first run
     const isFirstRun = !session.claudeSessionId;
+    
+    // Generate title for empty chats on first real prompt
+    let sessionTitle = session.title;
+    if (isFirstRun && session.title === "New Chat" && event.payload.prompt) {
+      // Generate title asynchronously but don't block
+      generateSessionTitle(event.payload.prompt)
+        .then((newTitle) => {
+          if (newTitle && newTitle !== "New Chat") {
+            sessions.updateSession(session.id, { title: newTitle });
+            emit({
+              type: "session.status",
+              payload: { sessionId: session.id, status: session.status, title: newTitle, cwd: session.cwd }
+            });
+          }
+        })
+        .catch((err) => {
+          console.error('Failed to generate title for continued session:', err);
+        });
+    }
 
     sessions.updateSession(session.id, { status: "running", lastPrompt: event.payload.prompt });
     sessionManager.emitToWindow(windowId, {
       type: "session.status",
-      payload: { sessionId: session.id, status: "running", title: session.title, cwd: session.cwd }
+      payload: { sessionId: session.id, status: "running", title: sessionTitle, cwd: session.cwd }
     });
 
-    sessionManager.emitToWindow(windowId, {
+    // Use emit() to save user_prompt to DB AND send to UI
+    emit({
       type: "stream.user_prompt",
       payload: { sessionId: session.id, prompt: event.payload.prompt }
     });
@@ -327,7 +350,8 @@ export function handleClientEvent(event: ClientEvent, windowId: number) {
         payload: {
           sessionId: updatedHistory.session.id,
           status: updatedHistory.session.status,
-          messages: updatedHistory.messages
+          messages: updatedHistory.messages,
+          todos: updatedHistory.todos || []
         }
       });
     }

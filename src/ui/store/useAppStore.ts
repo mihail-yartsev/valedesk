@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { ServerEvent, SessionStatus, StreamMessage } from "../types";
+import type { ServerEvent, SessionStatus, StreamMessage, TodoItem } from "../types";
 
 export type PermissionRequest = {
   toolUseId: string;
@@ -22,6 +22,7 @@ export type SessionView = {
   hydrated: boolean;
   inputTokens?: number;
   outputTokens?: number;
+  todos?: TodoItem[];
 };
 
 interface AppState {
@@ -152,7 +153,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       }
 
       case "session.history": {
-        const { sessionId, messages, status, inputTokens, outputTokens } = event.payload;
+        const { sessionId, messages, status, inputTokens, outputTokens, todos } = event.payload;
         set((state) => {
           const existing = state.sessions[sessionId] ?? createSession(sessionId);
           return {
@@ -165,7 +166,9 @@ export const useAppStore = create<AppState>((set, get) => ({
                 hydrated: true,
                 // Use token counts from payload (from DB), fallback to existing values
                 inputTokens: inputTokens ?? existing.inputTokens,
-                outputTokens: outputTokens ?? existing.outputTokens
+                outputTokens: outputTokens ?? existing.outputTokens,
+                // Load todos from DB
+                todos: todos ?? existing.todos
               }
             }
           };
@@ -175,6 +178,8 @@ export const useAppStore = create<AppState>((set, get) => ({
 
       case "session.status": {
         const { sessionId, status, title, cwd } = event.payload;
+        const isPendingStart = state.pendingStart;
+        
         set((state) => {
           const existing = state.sessions[sessionId] ?? createSession(sessionId);
           return {
@@ -185,13 +190,16 @@ export const useAppStore = create<AppState>((set, get) => ({
                 status,
                 title: title ?? existing.title,
                 cwd: cwd ?? existing.cwd,
-                updatedAt: Date.now()
+                updatedAt: Date.now(),
+                // Mark as hydrated if this is a new session we just started
+                // This prevents session.history from overwriting new messages
+                hydrated: isPendingStart ? true : existing.hydrated
               }
             }
           };
         });
 
-        if (state.pendingStart) {
+        if (isPendingStart) {
           get().setActiveSessionId(sessionId);
           set({ pendingStart: false, showStartModal: false });
         }
@@ -295,6 +303,23 @@ export const useAppStore = create<AppState>((set, get) => ({
 
       case "runner.error": {
         set({ globalError: event.payload.message });
+        break;
+      }
+
+      case "todos.updated": {
+        const { sessionId, todos } = event.payload;
+        set((state) => {
+          const existing = state.sessions[sessionId] ?? createSession(sessionId);
+          return {
+            sessions: {
+              ...state.sessions,
+              [sessionId]: {
+                ...existing,
+                todos
+              }
+            }
+          };
+        });
         break;
       }
     }

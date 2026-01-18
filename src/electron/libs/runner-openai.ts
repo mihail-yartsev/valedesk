@@ -550,27 +550,26 @@ export async function runClaude(options: RunnerOptions): Promise<RunnerHandle> {
         }
 
         // LOOP DETECTION: Check if model is stuck calling same tool repeatedly
-        // Skip loop detection for parallel tool calls (multiple different tools at once)
-        const uniqueToolNames = new Set(toolCalls.map(tc => tc.function.name));
-        const isParallelBatch = toolCalls.length > 1 && uniqueToolNames.size > 1;
+        // Skip loop detection for parallel tool calls (batches of 2+ tools)
+        // Parallel batches are intentional, not loops - even if same tool called multiple times
+        const isParallelBatch = toolCalls.length > 1;
         
         if (!isParallelBatch) {
-          // Only track single tool calls or same-tool batches
-          for (const toolCall of toolCalls) {
-            const callSignature = { 
-              name: toolCall.function.name, 
-              args: toolCall.function.arguments || '' 
-            };
-            recentToolCalls.push(callSignature);
-            
-            // Keep only last N calls
-            if (recentToolCalls.length > LOOP_DETECTION_WINDOW) {
-              recentToolCalls.shift();
-            }
+          // Only track single tool calls
+          const toolCall = toolCalls[0];
+          const callSignature = { 
+            name: toolCall.function.name, 
+            args: toolCall.function.arguments || '' 
+          };
+          recentToolCalls.push(callSignature);
+          
+          // Keep only last N calls
+          if (recentToolCalls.length > LOOP_DETECTION_WINDOW) {
+            recentToolCalls.shift();
           }
         } else {
-          // Parallel batch with different tools - clear loop detection
-          console.log(`[OpenAI Runner] Parallel batch (${uniqueToolNames.size} different tools) - resetting loop detection`);
+          // Parallel batch - clear loop detection (intentional parallel work)
+          console.log(`[OpenAI Runner] Parallel batch (${toolCalls.length} tools) - resetting loop detection`);
           recentToolCalls.length = 0;
         }
         

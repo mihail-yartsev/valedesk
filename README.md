@@ -24,11 +24,13 @@ https://github.com/user-attachments/assets/a8c54ce0-2fe0-40c3-8018-026cab9d7483
 - ✅ **WASM Sandbox** — secure JavaScript execution via QuickJS (no Node.js required)
 - ✅ **Document Support** — PDF and DOCX text extraction (bundled, works out of the box)
 - ✅ **Web Search** — Tavily and Z.AI integration for internet search
+- ✅ **Telegram Parsing** — render t.me channels with reactions, views, auto-scroll for older posts
 - ✅ **Security** — directory sandboxing for safe file operations
 - ✅ **Cross-platform** — Windows, macOS, Linux with proper shell commands
 
 ### UI/UX Features
 - ✅ **Modern Interface** — React + Electron with smooth auto-scroll and streaming
+- ✅ **Task Planning** — visual todo panel with progress tracking
 - ✅ **Message Editing** — edit and resend messages with history truncation
 - ✅ **Session Management** — pin important sessions, search through chat history
 - ✅ **Keyboard Shortcuts** — Cmd+Enter/Ctrl+Enter to send messages
@@ -40,6 +42,8 @@ https://github.com/user-attachments/assets/a8c54ce0-2fe0-40c3-8018-026cab9d7483
 - ✅ **Token Tracking** — display input/output tokens and API duration
 - ✅ **Optimized Streaming** — requestAnimationFrame-based UI updates (60fps)
 - ✅ **Stop Streaming** — interrupt LLM responses at any time
+- ✅ **Loop Detection** — automatic detection of stuck tool call loops
+- ✅ **Request Timeouts** — 5-minute timeout with auto-retry for LLM requests
 
 ## 🚀 Quick Start
 
@@ -135,14 +139,32 @@ All tools follow `snake_case` naming convention (`verb_noun` pattern):
 - No TypeScript, no async/await, no npm packages
 - Use `return` statement to output results
 
-### Web Tools (Optional)
+### Web Tools
 | Tool | Description |
 |------|-------------|
 | `search_web` | Search the internet (Tavily/Z.AI) |
 | `extract_page` | Extract full page content (Tavily only) |
 | `read_page` | Read web page content (Z.AI Reader) |
+| `render_page` | Render JS-heavy pages via Chromium (Telegram, SPAs) |
 
-### Memory (Optional)
+**render_page** features:
+- Auto-converts `t.me/channel` → `t.me/s/channel` (web preview)
+- Extracts reactions, views, dates from Telegram posts
+- Auto-scrolls to load older posts (`max_posts` parameter)
+- Works with any JavaScript-rendered page
+
+### Task Management
+| Tool | Description |
+|------|-------------|
+| `manage_todos` | Create/update task plans with visual progress tracking |
+
+**manage_todos** features:
+- Actions: `create`, `update`, `clear`
+- Statuses: `pending`, `in_progress`, `completed`, `cancelled`
+- Persisted per session in SQLite database
+- Visual TodoPanel with progress bar
+
+### Memory
 | Tool | Description |
 |------|-------------|
 | `manage_memory` | Store/read persistent user preferences |
@@ -159,6 +181,7 @@ src/
 │   └── libs/
 │       ├── runner-openai.ts    # OpenAI API runner
 │       ├── tools-executor.ts   # Tool execution logic
+│       ├── session-store.ts    # SQLite session persistence
 │       ├── container/
 │       │   └── quickjs-sandbox.ts  # WASM sandbox
 │       ├── prompts/
@@ -174,12 +197,18 @@ src/
 │           ├── read-document-tool.ts # read_document
 │           ├── web-search.ts       # search_web
 │           ├── extract-page-content.ts # extract_page
+│           ├── render-page-tool.ts # render_page (Telegram/SPA)
 │           ├── zai-reader.ts       # read_page
+│           ├── manage-todos-tool.ts # manage_todos
 │           └── memory-tool.ts      # manage_memory
 └── ui/                         # React frontend
     ├── App.tsx                 # Main component
-    ├── components/             # UI components
-    └── store/                  # Zustand state management
+    ├── components/
+    │   ├── TodoPanel.tsx       # Task planning UI
+    │   ├── PromptInput.tsx     # Message input
+    │   └── ...
+    └── store/
+        └── useAppStore.ts      # Zustand state management
 ```
 
 ## 📦 Building
@@ -203,11 +232,12 @@ npm run dist:linux
 - **Linux:** `~/.config/localdesk/`
 
 Files:
-- `sessions.db` — SQLite database with chat history
+- `sessions.db` — SQLite database with chat history and todos
 - `api-settings.json` — API configuration
 
 ### Global Data
 - `~/.localdesk/memory.md` — persistent memory storage
+- `~/.localdesk/logs/` — API request logs (debug)
 
 ## 📄 License
 

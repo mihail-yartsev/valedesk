@@ -419,7 +419,7 @@ function App() {
 
         {/* Todo Panel - fixed above input */}
         {activeSession?.todos && activeSession.todos.length > 0 && (
-          <div className="flex-shrink-0 px-4 pb-2 mx-auto w-full max-w-4xl" style={{ marginBottom: '200px' }}>
+          <div className="flex-shrink-0 px-4 pb-2 mx-auto w-full max-w-4xl" style={{ marginBottom: '120px' }}>
             <TodoPanel todos={activeSession.todos} />
           </div>
         )}

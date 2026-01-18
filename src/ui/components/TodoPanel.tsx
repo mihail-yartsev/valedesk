@@ -22,16 +22,18 @@ export function TodoPanel({ todos }: TodoPanelProps) {
   if (!todos || todos.length === 0) return null;
 
   const completed = todos.filter(t => t.status === 'completed').length;
+  const cancelled = todos.filter(t => t.status === 'cancelled').length;
   const total = todos.length;
   const percent = Math.round((completed / total) * 100);
   const inProgress = todos.find(t => t.status === 'in_progress');
+  const isAllDone = completed + cancelled === total;
 
   return (
-    <div className="bg-white border border-ink-200 rounded-lg shadow-sm">
+    <div className={`border rounded-lg shadow-sm ${isAllDone ? 'bg-green-50 border-green-200' : 'bg-white border-ink-200'}`}>
       {/* Header - always visible, clickable to expand/collapse */}
       <button 
         type="button"
-        className="w-full flex items-center justify-between p-2.5 cursor-pointer select-none hover:bg-ink-50 transition-colors text-left rounded-lg"
+        className="w-full flex items-center justify-between p-2.5 cursor-pointer select-none hover:bg-ink-50/50 transition-colors text-left rounded-lg"
         onClick={() => setIsExpanded(!isExpanded)}
       >
         <div className="flex items-center gap-2 min-w-0">
@@ -41,7 +43,9 @@ export function TodoPanel({ todos }: TodoPanelProps) {
           >
             ▼
           </span>
-          <span className="text-sm font-medium text-ink-700 flex-shrink-0">📋 Task Plan</span>
+          <span className="text-sm font-medium text-ink-700 flex-shrink-0">
+            {isAllDone ? '✅ Plan Complete' : '📋 Task Plan'}
+          </span>
           <span className="text-xs text-ink-500 flex-shrink-0">
             {completed}/{total}
           </span>
@@ -51,18 +55,24 @@ export function TodoPanel({ todos }: TodoPanelProps) {
               → {inProgress.content}
             </span>
           )}
+          {/* Show completion message when collapsed and done */}
+          {!isExpanded && isAllDone && (
+            <span className="text-xs text-green-600 ml-1">
+              All tasks completed!
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
           {/* Mini progress bar when collapsed */}
           {!isExpanded && (
             <div className="h-1.5 w-16 bg-ink-100 rounded-full overflow-hidden">
               <div 
-                className="h-full bg-green-500 rounded-full"
+                className={`h-full rounded-full ${isAllDone ? 'bg-green-500' : 'bg-green-500'}`}
                 style={{ width: `${percent}%` }}
               />
             </div>
           )}
-          <span className="text-xs font-mono text-ink-500">{percent}%</span>
+          <span className={`text-xs font-mono ${isAllDone ? 'text-green-600 font-semibold' : 'text-ink-500'}`}>{percent}%</span>
         </div>
       </button>
 
@@ -70,7 +80,7 @@ export function TodoPanel({ todos }: TodoPanelProps) {
       {isExpanded && (
         <>
           {/* Progress bar */}
-          <div className="h-1.5 bg-ink-100 mx-3 mb-2 rounded-full overflow-hidden">
+          <div className={`h-1.5 mx-3 mb-2 rounded-full overflow-hidden ${isAllDone ? 'bg-green-200' : 'bg-ink-100'}`}>
             <div 
               className="h-full bg-green-500 rounded-full transition-all duration-300 ease-out"
               style={{ width: `${percent}%` }}
@@ -78,8 +88,17 @@ export function TodoPanel({ todos }: TodoPanelProps) {
           </div>
 
           <div className="px-3 pb-3">
+            {/* Completion banner */}
+            {isAllDone && (
+              <div className="bg-green-100 border border-green-300 rounded px-2 py-1.5 mb-2 text-center">
+                <span className="text-xs text-green-700 font-medium">
+                  🎉 All {completed} tasks completed!
+                </span>
+              </div>
+            )}
+            
             {/* Current task highlight */}
-            {inProgress && (
+            {!isAllDone && inProgress && (
               <div className="bg-blue-50 border border-blue-200 rounded px-2 py-1.5 mb-2">
                 <div className="flex items-center gap-1.5">
                   <span className="text-sm">🔄</span>

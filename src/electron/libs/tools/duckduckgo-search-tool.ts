@@ -24,12 +24,18 @@ export const SearchToolDefinition: ToolDefinition = {
   type: "function",
   function: {
     name: "search",
-    description: `Search the web using DuckDuckGo (no API key required).
+    description: `Search the web using DuckDuckGo to FIND URLs (no API key required).
+
+**IMPORTANT: Use this to DISCOVER URLs, not to read them**
+- If you already have a URL, use fetch_html instead
+- This tool only returns search results (titles + URLs + snippets)
+- To read full content, use the URLs with fetch_html
 
 **Use this for:**
-- Finding information on the web
-- Discovering relevant URLs
+- Finding URLs about a topic
+- Discovering relevant websites
 - Research and fact-checking
+- When you DON'T have a specific URL yet
 
 **Parameters:**
 - query: Search query (required)
@@ -344,7 +350,7 @@ export async function executeSearchTool(
     if (!response.ok) {
       return {
         success: false,
-        output: `Search failed: HTTP ${response.status}`,
+        error: `Search failed: HTTP ${response.status}`,
       };
     }
 
@@ -354,7 +360,7 @@ export async function executeSearchTool(
     if (results.length === 0) {
       return {
         success: false,
-        output: `No results found for: ${query}`,
+        error: `No results found for: ${query}`,
       };
     }
 
@@ -371,7 +377,7 @@ export async function executeSearchTool(
   } catch (error: any) {
     return {
       success: false,
-      output: `Search failed: ${error.message}`,
+      error: `Search failed: ${error.message}`,
     };
   }
 }
@@ -397,7 +403,7 @@ export async function executeSearchNewsTool(
     if (!response.ok) {
       return {
         success: false,
-        output: `News search failed: HTTP ${response.status}`,
+        error: `News search failed: HTTP ${response.status}`,
       };
     }
 
@@ -407,7 +413,7 @@ export async function executeSearchNewsTool(
     if (results.length === 0) {
       return {
         success: false,
-        output: `No news results found for: ${query}`,
+        error: `No news results found for: ${query}`,
       };
     }
 
@@ -427,7 +433,7 @@ export async function executeSearchNewsTool(
   } catch (error: any) {
     return {
       success: false,
-      output: `News search failed: ${error.message}`,
+      error: `News search failed: ${error.message}`,
     };
   }
 }
@@ -453,7 +459,7 @@ export async function executeSearchImagesTool(
     if (!response.ok) {
       return {
         success: false,
-        output: `Image search failed: HTTP ${response.status}`,
+        error: `Image search failed: HTTP ${response.status}`,
       };
     }
 
@@ -463,7 +469,7 @@ export async function executeSearchImagesTool(
     if (results.length === 0) {
       return {
         success: false,
-        output: `No image results found for: ${query}`,
+        error: `No image results found for: ${query}`,
       };
     }
 
@@ -478,7 +484,7 @@ export async function executeSearchImagesTool(
   } catch (error: any) {
     return {
       success: false,
-      output: `Image search failed: ${error.message}`,
+      error: `Image search failed: ${error.message}`,
     };
   }
 }

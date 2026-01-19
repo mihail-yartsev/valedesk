@@ -592,7 +592,7 @@ export async function executeBrowserWaitForTool(
     } else {
       return {
         success: false,
-        output: "Must provide either selector or timeout",
+        error: \"Must provide either selector or timeout\",
       };
     }
   } catch (error: any) {

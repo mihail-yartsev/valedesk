@@ -123,17 +123,19 @@ export const FetchHtmlToolDefinition: ToolDefinition = {
   type: "function",
   function: {
     name: "fetch_html",
-    description: `Fetch HTML content and extract text.
+    description: `Fetch HTML content from a DIRECT URL and extract text.
+
+**IMPORTANT: Use this when you HAVE a specific URL** (e.g., github.com/user/repo, docs.example.com)
 
 **Use this for:**
-- Web page content extraction
-- Documentation pages
-- Blog posts and articles
+- Reading content from a known URL
+- GitHub pages, documentation, articles
+- Extracting text from web pages
 - Static websites
 
 **Don't use for:**
+- Finding URLs (use 'search' tool to discover URLs first)
 - Sites requiring JavaScript (use browser tools)
-- Interactive content
 
 **Parameters:**
 - url: The URL to fetch (required)
@@ -355,7 +357,7 @@ export async function executeFetchHtmlTool(
     if (!response.ok) {
       return {
         success: false,
-        output: `HTTP ${response.status}: ${response.statusText}`,
+        error: `HTTP ${response.status}: ${response.statusText}`,
       };
     }
 
@@ -400,7 +402,7 @@ export async function executeDownloadTool(
     if (!response.ok) {
       return {
         success: false,
-        output: `HTTP ${response.status}: ${response.statusText}`,
+        error: `HTTP ${response.status}: ${response.statusText}`,
       };
     }
 

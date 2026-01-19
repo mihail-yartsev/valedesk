@@ -39,7 +39,6 @@ import {
 import {
   executeFetchTool,
   executeFetchJsonTool,
-  executeFetchHtmlTool,
   executeDownloadTool,
 } from "./tools/fetch-tool.js";
 import {
@@ -308,14 +307,11 @@ export class ToolExecutor {
           return await executeGitShowTool(args as any, context);
 
         // Fetch tools
-        case "fetch":
+        case "fetch_html":
           return await executeFetchTool(args as any, context);
 
         case "fetch_json":
           return await executeFetchJsonTool(args as any, context);
-
-        case "fetch_html":
-          return await executeFetchHtmlTool(args as any, context);
 
         case "download":
           return await executeDownloadTool(args as any, context);

@@ -2,9 +2,8 @@
  * Fetch Tools - Simple HTTP client for web requests
  *
  * Tools:
- * - fetch: GET/POST HTTP requests
+ * - fetch: Versatile HTTP requests (raw, text extraction, HTML)
  * - fetch_json: Fetch and parse JSON
- * - fetch_html: Fetch HTML content
  * - download: Download files
  *
  * No API keys required - uses native fetch/axios
@@ -25,29 +24,41 @@ import * as path from "path";
 export const FetchToolDefinition: ToolDefinition = {
   type: "function",
   function: {
-    name: "fetch",
-    description: `Make HTTP requests to URLs (GET or POST).
+    name: "fetch_html",
+    description: `Fetch content from any URL. Default tool for reading web pages, APIs, or any HTTP resource.
 
-**Use this for:**
-- Simple web pages (static HTML)
-- API endpoints
-- Known URLs that don't require JavaScript
+**CRITICAL: Have a URL? → Use THIS tool (not browser_navigate, not search)**
 
-**Don't use for:**
-- Interactive sites (use browser tools instead)
-- Sites requiring JavaScript rendering
-- Local files (use read tool instead)
+**USE THIS FOR:**
+- ✓ GitHub pages, documentation, articles
+- ✓ API endpoints
+- ✓ Any URL you already have
+- ✓ Static web pages
+
+**DON'T use for:**
+- Finding URLs (use 'search' first, then fetch results)
+- Sites requiring JavaScript/login (use browser_navigate)
+- Local files (use read_file)
 
 **Parameters:**
 - url: The URL to fetch (required)
 - method: HTTP method (GET or POST, default: GET)
+- extract_text: Extract readable text from HTML (default: true for HTML content)
+- max_length: Maximum content length (default: 50000)
 - headers: Custom HTTP headers (optional)
 - body: Request body for POST (optional)
 
 **Returns:**
+With extract_text=true (default for HTML):
+- title: Page title (for HTML)
+- content: Clean text without HTML tags
+- url: The fetched URL
+- truncated: Whether content was truncated
+
+With extract_text=false:
 - status: HTTP status code
 - headers: Response headers
-- body: Response body as text`,
+- body: Raw response body`,
     parameters: {
       type: "object",
       properties: {
@@ -59,6 +70,15 @@ export const FetchToolDefinition: ToolDefinition = {
           type: "string",
           enum: ["GET", "POST"],
           description: "HTTP method (default: GET)",
+        },
+        extract_text: {
+          type: "boolean",
+          description:
+            "Extract text from HTML, removing tags (default: true for HTML)",
+        },
+        max_length: {
+          type: "number",
+          description: "Maximum content length in characters (default: 50000)",
         },
         headers: {
           type: "object",
@@ -112,56 +132,6 @@ export const FetchJsonToolDefinition: ToolDefinition = {
         body: {
           type: "object",
           description: "Request body for POST (will be JSON stringified)",
-        },
-      },
-      required: ["url"],
-    },
-  },
-};
-
-export const FetchHtmlToolDefinition: ToolDefinition = {
-  type: "function",
-  function: {
-    name: "fetch_html",
-    description: `Fetch HTML content from a URL. THIS IS THE DEFAULT TOOL FOR ANY DIRECT URL.
-
-**CRITICAL: Have a URL? → Use THIS tool (not browser_navigate, not search)**
-**GitHub/docs/articles? → Use THIS (10x faster than browser)**
-
-**USE THIS FOR:**
-- ✓ GitHub pages (github.com/...)
-- ✓ Documentation sites
-- ✓ Blog posts and articles
-- ✓ ANY URL you already have
-- ✓ Static web pages
-
-**DON'T use for:**
-- Finding URLs (use 'search' to discover, then use fetch_html with results)
-- Sites requiring JavaScript/login (use browser_navigate)
-
-**Parameters:**
-- url: The URL to fetch (required)
-- extract_text: Extract text only, no HTML tags (default: true)
-- max_length: Maximum response length in characters (default: 50000)
-
-**Returns:**
-- title: Page title
-- content: HTML or extracted text
-- url: The fetched URL`,
-    parameters: {
-      type: "object",
-      properties: {
-        url: {
-          type: "string",
-          description: "URL to fetch HTML from",
-        },
-        extract_text: {
-          type: "boolean",
-          description: "Extract text only without HTML tags (default: true)",
-        },
-        max_length: {
-          type: "number",
-          description: "Maximum content length (default: 50000)",
         },
       },
       required: ["url"],
@@ -257,12 +227,14 @@ export async function executeFetchTool(
   args: {
     url: string;
     method?: string;
+    extract_text?: boolean;
+    max_length?: number;
     headers?: Record<string, string>;
     body?: string;
   },
   context: ToolExecutionContext,
 ): Promise<ToolResult> {
-  const { url, method = "GET", headers = {}, body } = args;
+  const { url, method = "GET", headers = {}, body, max_length = 50000 } = args;
 
   try {
     const response = await fetch(url, {
@@ -275,21 +247,56 @@ export async function executeFetchTool(
       body: body ? body : undefined,
     });
 
-    const responseBody = await response.text();
+    if (!response.ok) {
+      return {
+        success: false,
+        error: `HTTP ${response.status}: ${response.statusText}`,
+      };
+    }
 
-    return {
-      success: true,
-      output: JSON.stringify(
-        {
-          status: response.status,
-          statusText: response.statusText,
-          headers: Object.fromEntries(response.headers.entries()),
-          body: responseBody.substring(0, 50000), // Limit response size
-        },
-        null,
-        2,
-      ),
-    };
+    const responseBody = await response.text();
+    const contentType = response.headers.get("content-type") || "";
+    const isHtml = contentType.includes("text/html");
+
+    // Auto-detect: extract text by default for HTML, return raw for everything else
+    const shouldExtractText =
+      args.extract_text !== undefined ? args.extract_text : isHtml;
+
+    if (shouldExtractText && isHtml) {
+      // HTML text extraction mode
+      const title = extractTitle(responseBody);
+      const content = extractTextFromHtml(responseBody);
+
+      const result = {
+        url,
+        title,
+        content: content.substring(0, max_length),
+        length: content.length,
+        truncated: content.length > max_length,
+      };
+
+      return {
+        success: true,
+        output: JSON.stringify(result, null, 2),
+      };
+    } else {
+      // Raw mode: return full HTTP details
+      return {
+        success: true,
+        output: JSON.stringify(
+          {
+            status: response.status,
+            statusText: response.statusText,
+            headers: Object.fromEntries(response.headers.entries()),
+            body: responseBody.substring(0, max_length),
+            length: responseBody.length,
+            truncated: responseBody.length > max_length,
+          },
+          null,
+          2,
+        ),
+      };
+    }
   } catch (error: any) {
     return {
       success: false,
@@ -338,51 +345,6 @@ export async function executeFetchJsonTool(
     return {
       success: false,
       output: `Failed to fetch JSON from ${url}: ${error.message}`,
-    };
-  }
-}
-
-export async function executeFetchHtmlTool(
-  args: { url: string; extract_text?: boolean; max_length?: number },
-  context: ToolExecutionContext,
-): Promise<ToolResult> {
-  const { url, extract_text = true, max_length = 50000 } = args;
-
-  try {
-    const response = await fetch(url, {
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
-      },
-    });
-
-    if (!response.ok) {
-      return {
-        success: false,
-        error: `HTTP ${response.status}: ${response.statusText}`,
-      };
-    }
-
-    const html = await response.text();
-    const title = extractTitle(html);
-    const content = extract_text ? extractTextFromHtml(html) : html;
-
-    const result = {
-      url,
-      title,
-      content: content.substring(0, max_length),
-      length: content.length,
-      truncated: content.length > max_length,
-    };
-
-    return {
-      success: true,
-      output: JSON.stringify(result, null, 2),
-    };
-  } catch (error: any) {
-    return {
-      success: false,
-      output: `Failed to fetch HTML from ${url}: ${error.message}`,
     };
   }
 }
@@ -438,6 +400,5 @@ export async function executeDownloadTool(
 export const ALL_FETCH_TOOL_DEFINITIONS = [
   FetchToolDefinition,
   FetchJsonToolDefinition,
-  FetchHtmlToolDefinition,
   DownloadToolDefinition,
 ];

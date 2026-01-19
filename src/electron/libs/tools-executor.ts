@@ -268,6 +268,9 @@ export class ToolExecutor {
         case "render_page":
           return await executeRenderPageTool(args as any, context);
 
+        case "schedule_task":
+          return await this.executeScheduleTask(args, context);
+
         case "manage_todos":
           return await executeManageTodosTool(args as any, context);
 

@@ -14,12 +14,11 @@ export function getTools(settings: ApiSettings | null) {
     tools = tools.filter(tool => tool.function.name !== 'manage_memory');
   }
   
-  // Filter out ZaiReader if not enabled or Z.AI API key not provided
+  // Filter out ZaiReader if not enabled
   const zaiReaderEnabled = settings?.enableZaiReader === true;
-  const hasZaiKey = Boolean(settings?.zaiApiKey);
-  console.log(`[getTools] enableZaiReader: ${zaiReaderEnabled}, hasZaiKey: ${hasZaiKey}`);
-  
-  if (!zaiReaderEnabled || !hasZaiKey) {
+  console.log(`[getTools] enableZaiReader: ${zaiReaderEnabled}`);
+
+  if (!zaiReaderEnabled) {
     tools = tools.filter(tool => tool.function.name !== 'read_page');
   }
   

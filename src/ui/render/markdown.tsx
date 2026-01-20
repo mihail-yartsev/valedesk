@@ -12,6 +12,7 @@ const initMermaid = () => {
     mermaid.initialize({
       startOnLoad: false,
       theme: 'base',
+      logLevel: 'error', // Only log errors, not warnings
       themeVariables: {
         primaryColor: '#D97757',
         primaryTextColor: '#1A1915',
@@ -30,28 +31,115 @@ const initMermaid = () => {
   }
 };
 
+// Store IDs of mermaid diagrams we're currently rendering
+const renderingIds = new Set<string>();
+
+// Clean up any mermaid artifacts in the DOM
+const cleanupMermaidArtifacts = (currentId?: string) => {
+  const body = document.body;
+  if (!body) return;
+
+  // Remove mermaid temp elements that aren't part of active rendering
+  body.querySelectorAll('[id^="mermaid-"]').forEach(el => {
+    const id = el.id;
+    // Only remove if it's not the current element being rendered
+    // and not in our active set
+    if (id !== currentId && !renderingIds.has(id)) {
+      const text = el.textContent?.trim() || '';
+      if (text.includes('error in text') || text.includes('mermaid version') || text.includes('Parse error')) {
+        console.log('[Mermaid] Removing artifact:', id, text.substring(0, 50));
+        el.remove();
+      }
+    }
+  });
+
+  // Also check for any orphaned error elements that might be in the DOM
+  const allDivs = body.querySelectorAll('div');
+  allDivs.forEach(el => {
+    const text = el.textContent?.trim() || '';
+    // Remove elements that are clearly mermaid error messages
+    if ((text.includes('error in text') || text.includes('mermaid version')) &&
+        text.length < 200 &&
+        !el.querySelector('svg') && // Not a rendered diagram
+        el.children.length === 0) { // Simple text node, not complex structure
+      console.log('[Mermaid] Removing error element:', el);
+      el.remove();
+    }
+  });
+};
+
 const MermaidDiagram = ({ code }: { code: string }) => {
   const [svg, setSvg] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
   const ref = useRef<HTMLDivElement>(null);
+  const currentIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     initMermaid();
 
     const renderDiagram = async () => {
+      const id = `mermaid-${Math.random().toString(36).substr(2, 9)}`;
+      currentIdRef.current = id;
+      renderingIds.add(id);
+
+      // Clean up any previous mermaid artifacts before rendering
+      cleanupMermaidArtifacts(id);
+
       try {
-        const id = `mermaid-${Math.random().toString(36).substr(2, 9)}`;
-        const { svg } = await mermaid.render(id, code);
+        const cleanCode = code.trim();
+        const { svg } = await mermaid.render(id, cleanCode);
+
+        // Remove the temporary element that mermaid creates during rendering
+        const tempElement = document.getElementById(id);
+        if (tempElement) {
+          tempElement.remove();
+        }
+
+        // Clean up any artifacts that may have been added during render
+        cleanupMermaidArtifacts(id);
+
         setSvg(svg);
         setError(null);
       } catch (err) {
+        // Mermaid v11 throws error with a special structure
         console.error('Mermaid rendering error:', err);
-        setError(err instanceof Error ? err.message : 'Failed to render diagram');
+
+        // Clean up any artifacts even on error
+        cleanupMermaidArtifacts(id);
+
+        // Try to extract error from mermaid's error structure
+        let errorMsg = 'Failed to render diagram';
+        if (err instanceof Error) {
+          errorMsg = err.message;
+        } else if (typeof err === 'object' && err !== null) {
+          errorMsg = (err as any).message || JSON.stringify(err);
+        }
+
+        setError(errorMsg);
+      } finally {
+        // Remove from active set when done
+        renderingIds.delete(id);
+        currentIdRef.current = null;
       }
     };
 
     renderDiagram();
+
+    // Cleanup function for when component unmounts or code changes
+    return () => {
+      const id = currentIdRef.current;
+      if (id) {
+        renderingIds.delete(id);
+      }
+    };
   }, [code]);
+
+  // Additional cleanup on unmount for any remaining artifacts
+  useEffect(() => {
+    return () => {
+      cleanupMermaidArtifacts(currentIdRef.current ?? undefined);
+    };
+  }, []);
 
   if (error) {
     return (

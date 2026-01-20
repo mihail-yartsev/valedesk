@@ -15,7 +15,7 @@ const BROWSER_TOOLS = ['browser_navigate', 'browser_click', 'browser_type', 'bro
 const DUCKDUCKGO_TOOLS = ['search', 'search_news', 'search_images'];
 
 // Fetch/HTTP tool names
-const FETCH_TOOLS = ['fetch', 'fetch_json', 'download'];
+const FETCH_TOOLS = ['fetch', 'fetch_json', 'download', 'fetch_html'];
 
 // Get tools based on settings
 export function getTools(settings: ApiSettings | null) {

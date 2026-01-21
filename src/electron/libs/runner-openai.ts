@@ -42,28 +42,32 @@ type ChatMessage = {
   name?: string;
 };
 
-// Logging
-const getLogsDir = () => {
-  const logsDir = join(homedir(), '.localdesk', 'logs');
-  if (!existsSync(logsDir)) {
-    mkdirSync(logsDir, { recursive: true });
+// Logging - organized by session folders with turn-based request/response files
+const getSessionLogsDir = (sessionId: string) => {
+  const baseDir = join(homedir(), '.localdesk', 'logs', 'sessions', sessionId);
+  if (!existsSync(baseDir)) {
+    mkdirSync(baseDir, { recursive: true });
   }
-  return logsDir;
+  return baseDir;
 };
 
-const logApiRequest = (sessionId: string, data: any) => {
+const logTurn = (sessionId: string, iteration: number, type: 'request' | 'response', data: any) => {
   try {
-    const logsDir = getLogsDir();
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const filename = `openai-request-${sessionId}-${timestamp}.json`;
+    const logsDir = getSessionLogsDir(sessionId);
+    const paddedIteration = String(iteration).padStart(3, '0');
+    const filename = `turn-${paddedIteration}-${type}.json`;
     const filepath = join(logsDir, filename);
     
     writeFileSync(filepath, JSON.stringify(data, null, 2), 'utf8');
-    console.log(`[OpenAI Runner] Request logged to: ${filepath}`);
+    
+    if (type === 'request' && iteration === 1) {
+      console.log(`[OpenAI Runner] Session logs: ${logsDir}`);
+    }
   } catch (error) {
-    console.error('[OpenAI Runner] Failed to write log:', error);
+    console.error(`[OpenAI Runner] Failed to write ${type} log:`, error);
   }
 };
+
 
 export async function runClaude(options: RunnerOptions): Promise<RunnerHandle> {
   const { prompt, session, onEvent, onSessionUpdate } = options;
@@ -282,33 +286,49 @@ export async function runClaude(options: RunnerOptions): Promise<RunnerHandle> {
         if (history && history.messages.length > 0) {
           console.log(`[OpenAI Runner] Loading ${history.messages.length} messages from history`);
           
-          let currentAssistantMessage = '';
-          let currentMessageHasTools = false;
-          let currentMessageNoteAdded = false;
-          let pendingToolUse: any = null;
+          let currentAssistantText = '';
+          let currentToolCalls: any[] = [];
+          let pendingToolResults: Map<string, { output: string; isError: boolean }> = new Map();
           
-          // Convert session history to OpenAI format
+          // Convert session history to OpenAI format (proper tool call format)
           for (const msg of history.messages) {
             if (msg.type === 'user_prompt') {
               const promptText = (msg as any).prompt || '';
               
-              // Flush any pending assistant message
-              if (currentAssistantMessage.trim()) {
-                messages.push({
+              // Flush any pending assistant message with tool calls
+              if (currentAssistantText.trim() || currentToolCalls.length > 0) {
+                // Add assistant message (with or without tool calls)
+                const assistantMsg: ChatMessage = {
                   role: 'assistant',
-                  content: currentAssistantMessage.trim()
-                });
-                currentAssistantMessage = '';
-                currentMessageHasTools = false;
-                currentMessageNoteAdded = false;
+                  content: currentAssistantText.trim() || ''
+                };
+                if (currentToolCalls.length > 0) {
+                  assistantMsg.tool_calls = currentToolCalls;
+                }
+                messages.push(assistantMsg);
+                
+                // Add tool results as separate messages (OpenAI format)
+                for (const tc of currentToolCalls) {
+                  const result = pendingToolResults.get(tc.id);
+                  if (result) {
+                    messages.push({
+                      role: 'tool',
+                      tool_call_id: tc.id,
+                      name: tc.function.name,
+                      content: result.isError ? `Error: ${result.output}` : result.output
+                    });
+                  }
+                }
+                
+                currentAssistantText = '';
+                currentToolCalls = [];
+                pendingToolResults.clear();
               }
               
               // Track last user prompt to avoid duplication
               lastUserPrompt = promptText;
               
               // ALWAYS format user prompts with date (even from history)
-              // This ensures consistent context for the model
-              // Only add memory to the FIRST user prompt
               const formattedPromptText = isFirstUserPrompt 
                 ? getInitialPrompt(promptText, memoryContent)
                 : getInitialPrompt(promptText);
@@ -320,44 +340,57 @@ export async function runClaude(options: RunnerOptions): Promise<RunnerHandle> {
               });
             } else if (msg.type === 'text') {
               // Accumulate text into assistant message
-              currentAssistantMessage += (msg as any).text || '';
+              currentAssistantText += (msg as any).text || '';
             } else if (msg.type === 'tool_use') {
-              // Mark that this message has tools
-              currentMessageHasTools = true;
+              // Add tool call in OpenAI format
+              const toolId = (msg as any).id || `call_${Date.now()}_${currentToolCalls.length}`;
+              const toolName = (msg as any).name || 'unknown';
+              const toolInput = (msg as any).input || {};
               
-              // Add note about compressed history on first tool call in THIS message
-              if (!currentMessageNoteAdded) {
-                currentAssistantMessage += `\n\n---\nNote: The following shows compressed tool execution history for context. To perform actions, use actual function calling.\n---\n\n`;
-                currentMessageNoteAdded = true;
-              }
-              
-              // Store tool use for pairing with result
-              pendingToolUse = msg;
+              currentToolCalls.push({
+                id: toolId,
+                type: 'function',
+                function: {
+                  name: toolName,
+                  arguments: JSON.stringify(toolInput)
+                }
+              });
             } else if (msg.type === 'tool_result') {
-              // Compressed tool history: CSV format - tool,explanation,result
-              if (pendingToolUse) {
-                const toolName = (pendingToolUse as any).name || 'Unknown';
-                const toolInput = (pendingToolUse as any).input || {};
-                const explanation = toolInput.explanation || 'No explanation';
-                const output = (msg as any).output || '';
-                const isError = (msg as any).is_error;
-                const briefOutput = output.substring(0, 80).replace(/\n/g, ' ');
-                
-                currentAssistantMessage += `${toolName},${explanation},${isError ? 'ERROR: ' : ''}${briefOutput}${output.length > 80 ? '...' : ''}\n`;
-                pendingToolUse = null;
+              // Store tool result for pairing with tool call
+              const toolUseId = (msg as any).tool_use_id;
+              const output = (msg as any).output || '';
+              const isError = (msg as any).is_error || false;
+              
+              if (toolUseId) {
+                pendingToolResults.set(toolUseId, { output, isError });
               }
             }
             // Skip other message types (system, etc.)
           }
           
           // Flush final assistant message if any
-          if (currentAssistantMessage.trim()) {
-            messages.push({
+          if (currentAssistantText.trim() || currentToolCalls.length > 0) {
+            const assistantMsg: ChatMessage = {
               role: 'assistant',
-              content: currentAssistantMessage.trim()
-            });
-            currentMessageHasTools = false;
-            currentMessageNoteAdded = false;
+              content: currentAssistantText.trim() || ''
+            };
+            if (currentToolCalls.length > 0) {
+              assistantMsg.tool_calls = currentToolCalls;
+            }
+            messages.push(assistantMsg);
+            
+            // Add tool results
+            for (const tc of currentToolCalls) {
+              const result = pendingToolResults.get(tc.id);
+              if (result) {
+                messages.push({
+                  role: 'tool',
+                  tool_call_id: tc.id,
+                  name: tc.function.name,
+                  content: result.isError ? `Error: ${result.output}` : result.output
+                });
+              }
+            }
           }
         }
       }
@@ -383,30 +416,18 @@ export async function runClaude(options: RunnerOptions): Promise<RunnerHandle> {
       let activeTools = getTools(guiSettings);
       let currentGuiSettings = guiSettings;
       
-      // Get system prompt
-      const systemPrompt = messages[0]?.content 
-        ? (typeof messages[0].content === 'string' ? messages[0].content : '[complex content]')
-        : '[no system prompt]';
-      
       console.log(`\n[OpenAI Runner] ══════════════════════════════════════`);
       console.log(`[OpenAI Runner] Session: ${session.id}`);
       console.log(`[OpenAI Runner] Provider: ${providerInfo}`);
       console.log(`[OpenAI Runner] Model: ${modelName}`);
       console.log(`[OpenAI Runner] Temperature: ${temperature !== undefined ? temperature : '(not sent)'}`)
       console.log(`[OpenAI Runner] Base URL: ${baseURL}`);
+      console.log(`[OpenAI Runner] Messages: ${messages.length}`);
       console.log(`[OpenAI Runner] Tools: ${activeTools.length} (${activeTools.map(t => t.function.name).join(', ')})`);
-      console.log(`[OpenAI Runner] ══════════════════════════════════════`);
-      console.log(`[OpenAI Runner] System Prompt (raw JSON):`);
-      console.log(JSON.stringify({ role: 'system', content: systemPrompt }, null, 2));
       console.log(`[OpenAI Runner] ══════════════════════════════════════\n`);
       
-      // Log to file
-      logApiRequest(session.id, {
-        model: modelName,
-        messages,
-        tools: activeTools,
-        temperature: temperature
-      });
+      // Session logs will be saved to: ~/.localdesk/logs/sessions/{sessionId}/
+      console.log(`[OpenAI Runner] Session logs: ~/.localdesk/logs/sessions/${session.id}/`);
 
       // Send system init message
       sendMessage('system', {
@@ -431,13 +452,21 @@ export async function runClaude(options: RunnerOptions): Promise<RunnerHandle> {
       // Loop detection: track recent tool calls
       const recentToolCalls: { name: string; args: string }[] = [];
       const LOOP_DETECTION_WINDOW = 5; // Check last N tool calls
-      const LOOP_THRESHOLD = 3; // Same tool called N times = loop
+      const LOOP_THRESHOLD = 5; // Same tool called N times = loop
       const MAX_LOOP_RETRIES = 5; // Max retries before stopping
       let loopRetryCount = 0;
       let loopHintAdded = false;
 
       while (!aborted && iterationCount < MAX_ITERATIONS) {
         iterationCount++;
+        
+        // Update system prompt with current todos (they may have changed via manage_todos)
+        const updatedTodosSummary = getTodosSummary(session.id);
+        let updatedSystemContent = getSystemPrompt(currentCwd, currentGuiSettings);
+        if (updatedTodosSummary) {
+          updatedSystemContent += updatedTodosSummary;
+        }
+        messages[0] = { role: 'system', content: updatedSystemContent };
         
         // Reload settings to pick up any changes (e.g. Tavily API key, memory enabled)
         const freshSettings = loadApiSettings();
@@ -456,6 +485,16 @@ export async function runClaude(options: RunnerOptions): Promise<RunnerHandle> {
         }
         
         console.log(`\n[OpenAI Runner] ▶ Iteration ${iterationCount} | Messages: ${messages.length} | Tools: ${activeTools.length}`);
+
+        // Log request to file
+        const requestPayload = {
+          model: modelName,
+          messages,
+          tools: activeTools,
+          temperature,
+          timestamp: new Date().toISOString()
+        };
+        logTurn(session.id, iterationCount, 'request', requestPayload);
 
         // Call OpenAI API - build params conditionally
         const stream = await client.chat.completions.create({
@@ -589,10 +628,8 @@ export async function runClaude(options: RunnerOptions): Promise<RunnerHandle> {
           totalOutputTokens += streamMetadata.usage.completion_tokens || 0;
         }
         
-        // Raw JSON response log
-        console.log(`[OpenAI Runner] ──────────────────────────────────────`);
-        console.log(`[OpenAI Runner] Response (raw JSON):`);
-        console.log(JSON.stringify({
+        // Log response to file
+        const responsePayload = {
           id: streamMetadata.id,
           model: streamMetadata.model,
           finish_reason: streamMetadata.finishReason,
@@ -601,8 +638,11 @@ export async function runClaude(options: RunnerOptions): Promise<RunnerHandle> {
             role: 'assistant',
             content: assistantMessage || null,
             tool_calls: toolCalls.length > 0 ? toolCalls : undefined
-          }
-        }, null, 2));
+          },
+          timestamp: new Date().toISOString()
+        };
+        logTurn(session.id, iterationCount, 'response', responsePayload);
+        
         console.log(`[OpenAI Runner] ──────────────────────────────────────`);
         
         // If no tool calls, we're done

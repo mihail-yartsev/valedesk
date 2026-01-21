@@ -2,7 +2,7 @@
 
 # LocalDesk
 
-[![Version](https://img.shields.io/badge/version-0.0.5-blue.svg)](https://github.com/vakovalskii/LocalDesk/releases)
+[![Version](https://img.shields.io/badge/version-0.0.6-blue.svg)](https://github.com/vakovalskii/LocalDesk/releases)
 [![Platform](https://img.shields.io/badge/platform-%20Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg)](https://github.com/vakovalskii/LocalDesk)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
@@ -42,8 +42,9 @@ https://github.com/user-attachments/assets/a8c54ce0-2fe0-40c3-8018-026cab9d7483
 - ✅ **Token Tracking** — display input/output tokens and API duration
 - ✅ **Optimized Streaming** — requestAnimationFrame-based UI updates (60fps)
 - ✅ **Stop Streaming** — interrupt LLM responses at any time
-- ✅ **Loop Detection** — automatic detection of stuck tool call loops
+- ✅ **Loop Detection** — automatic detection of stuck tool call loops (5+ sequential same-tool calls)
 - ✅ **Request Timeouts** — 5-minute timeout with auto-retry for LLM requests
+- ✅ **Session Logging** — full request/response JSON logs per iteration in `~/.localdesk/logs/sessions/`
 
 ## 🚀 Quick Start
 
@@ -290,7 +291,9 @@ Files:
 
 ### Global Data
 - `~/.localdesk/memory.md` — persistent memory storage
-- `~/.localdesk/logs/` — API request logs (debug)
+- `~/.localdesk/logs/sessions/{session-id}/` — per-session API logs:
+  - `turn-001-request.json` — full request (model, messages, tools, temperature)
+  - `turn-001-response.json` — full response (usage, content, tool_calls)
 
 ## 📄 License
 

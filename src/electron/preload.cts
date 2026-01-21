@@ -35,6 +35,9 @@ electron.contextBridge.exposeInMainWorld("electron", {
         electron.ipcRenderer.invoke(channel, ...args),
     send: (channel: string, ...args: any[]) => 
         electron.ipcRenderer.send(channel, ...args)
+    ,
+    // Notifications
+    sendNotification: (title: string, body: string) => ipcInvoke("send-notification", { title, body })
 } satisfies Window['electron'])
 
 function ipcInvoke<Key extends keyof EventPayloadMapping>(key: Key, ...args: any[]): Promise<EventPayloadMapping[Key]> {

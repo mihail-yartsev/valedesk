@@ -42,6 +42,7 @@ type EventPayloadMapping = {
     "write-memory": void;
     "get-build-info": BuildInfo;
     "open-external-url": { success: boolean; error?: string };
+    "send-notification": { success: boolean; error?: string };
 }
 
 interface Window {
@@ -57,5 +58,7 @@ interface Window {
         // File browser APIs
         invoke: (channel: string, ...args: any[]) => Promise<any>;
         send: (channel: string, ...args: any[]) => void;
+        // Notifications
+        sendNotification: (title: string, body: string) => Promise<{ success: boolean; error?: string }>
     }
 }

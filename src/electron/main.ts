@@ -1,4 +1,5 @@
 import { app, BrowserWindow, ipcMain, dialog, shell, Menu } from "electron"
+import { Notification } from "electron";
 import { ipcMainHandle, isDev, DEV_PORT } from "./util.js";
 import { getPreloadPath, getUIPath, getIconPath } from "./pathResolver.js";
 import { getStaticData, pollResources } from "./test.js";
@@ -320,6 +321,18 @@ app.on("ready", () => {
         } catch (error: any) {
             console.error('[Main] Error opening URL:', error);
             return { success: false, error: error.message };
+        }
+    });
+
+    // Allow renderer to request a desktop notification (typed via EventPayloadMapping)
+    ipcMainHandle("send-notification", async (_: any, payload: { title: string; body: string }) => {
+        try {
+            const n = new Notification({ title: payload.title, body: payload.body, silent: false });
+            n.show();
+            return { success: true };
+        } catch (error: any) {
+            console.error('[Main] Failed to show notification:', error);
+            return { success: false, error: String(error) };
         }
     });
 })

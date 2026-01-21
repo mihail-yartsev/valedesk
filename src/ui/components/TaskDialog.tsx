@@ -76,29 +76,23 @@ export function TaskDialog({
     { id: "1", model: "", prompt: "" }
   ]);
 
-  // Combine available models from API and LLM providers
+  // Show only enabled models from settings.
+  // If no LLM models are configured, fall back to legacy API models.
   const allAvailableModels = (() => {
-    const models: ModelInfo[] = [];
-    
-    // Add legacy API models
-    availableModels.forEach(model => {
-      models.push({
-        id: model.id,
-        name: model.name,
-        description: model.description
-      });
-    });
-    
-    // Add LLM provider models (all except explicitly disabled)
-    llmModels.filter(m => m.enabled !== false).forEach(model => {
-      models.push({
+    const enabledLlmModels = llmModels.filter(m => m.enabled);
+    if (enabledLlmModels.length > 0) {
+      return enabledLlmModels.map(model => ({
         id: model.id,
         name: model.name,
         description: `${model.providerType} | ${model.description || ''}`
-      });
-    });
-    
-    return models;
+      }));
+    }
+
+    return availableModels.map(model => ({
+      id: model.id,
+      name: model.name,
+      description: model.description
+    }));
   })();
 
   const handleAddTask = () => {

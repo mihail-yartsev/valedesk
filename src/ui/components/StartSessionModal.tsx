@@ -46,31 +46,23 @@ export function StartSessionModal({
     window.electron.getRecentCwds().then(setRecentCwds).catch(console.error);
   }, []);
 
-  // Combine available models from API and LLM providers
+  // Show only enabled models from settings.
+  // If no LLM models are configured, fall back to legacy API models.
   const allAvailableModels = (() => {
-    const models: Array<{ id: string; name: string; description?: string }> = [];
-    
-    // Add legacy API models
-    availableModels.forEach(model => {
-      models.push({
-        id: model.id,
-        name: model.name,
-        description: model.description
-      });
-    });
-    
-    // Add LLM provider models (all except explicitly disabled)
-    const enabledLlmModels = llmModels.filter(m => m.enabled !== false);
-    
-    enabledLlmModels.forEach(model => {
-      models.push({
+    const enabledLlmModels = llmModels.filter(m => m.enabled);
+    if (enabledLlmModels.length > 0) {
+      return enabledLlmModels.map(model => ({
         id: model.id,
         name: model.name,
         description: `${model.providerType} | ${model.description || ''}`
-      });
-    });
-    
-    return models;
+      }));
+    }
+
+    return availableModels.map(model => ({
+      id: model.id,
+      name: model.name,
+      description: model.description
+    }));
   })();
 
   // Filter models based on search

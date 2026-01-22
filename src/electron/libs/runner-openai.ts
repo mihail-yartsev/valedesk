@@ -875,9 +875,28 @@ export async function runClaude(options: RunnerOptions): Promise<RunnerHandle> {
           });
         }
 
+        // Helper to safely parse tool arguments
+        const safeParseToolArgs = (args: string | undefined, toolName: string): Record<string, any> => {
+          if (!args || args === '') return {};
+          try {
+            return JSON.parse(args);
+          } catch (e) {
+            console.error(`[OpenAI Runner] Failed to parse tool arguments for ${toolName}:`, args);
+            // Try to fix common JSON issues
+            try {
+              // Sometimes model outputs truncated JSON, try to close it
+              const fixed = args.replace(/,\s*$/, '') + '}';
+              return JSON.parse(fixed);
+            } catch {
+              // Return error info as argument
+              return { _parse_error: `Invalid JSON: ${args.substring(0, 200)}...` };
+            }
+          }
+        };
+
         // Send tool use messages
         for (const toolCall of toolCalls) {
-          const toolInput = JSON.parse(toolCall.function.arguments || '{}');
+          const toolInput = safeParseToolArgs(toolCall.function.arguments, toolCall.function.name);
           
           // For UI display - assistant message with tool_use
           sendMessage('assistant', {
@@ -912,7 +931,18 @@ export async function runClaude(options: RunnerOptions): Promise<RunnerHandle> {
           }
 
           const toolName = toolCall.function.name;
-          const toolArgs = JSON.parse(toolCall.function.arguments || '{}');
+          const toolArgs = safeParseToolArgs(toolCall.function.arguments, toolName);
+
+          // Check for parse error
+          if (toolArgs._parse_error) {
+            console.error(`[OpenAI Runner] Skipping tool ${toolName} due to parse error`);
+            toolResults.push({
+              role: 'tool',
+              tool_call_id: toolCall.id,
+              content: `Error: Failed to parse tool arguments. ${toolArgs._parse_error}`
+            });
+            continue;
+          }
 
           // Request permission
           const toolUseId = toolCall.id;

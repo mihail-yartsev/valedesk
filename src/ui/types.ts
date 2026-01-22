@@ -26,6 +26,21 @@ export interface FileChange {
   status: ChangeStatus;      // 'pending' = can be rolled back, 'confirmed' = cannot rollback
 }
 
+// Skill types
+export interface Skill {
+  id: string;
+  name: string;
+  description: string;
+  category?: string;
+  author?: string;
+  version?: string;
+  license?: string;
+  compatibility?: string;
+  repoPath: string;
+  enabled: boolean;
+  lastUpdated?: number;
+}
+
 export type SessionInfo = {
   id: string;
   title: string;
@@ -193,7 +208,10 @@ export type ServerEvent =
   | { type: "llm.providers.saved"; payload: { settings: LLMProviderSettings } }
   | { type: "llm.models.fetched"; payload: { providerId: string; models: LLMModel[] } }
   | { type: "llm.models.error"; payload: { providerId: string; message: string } }
-  | { type: "llm.models.checked"; payload: { unavailableModels: string[] } };
+  | { type: "llm.models.checked"; payload: { unavailableModels: string[] } }
+  // Skills events
+  | { type: "skills.loaded"; payload: { skills: Skill[]; marketplaceUrl: string; lastFetched?: number } }
+  | { type: "skills.error"; payload: { message: string } };
 
 // Client -> Server events
 export type ClientEvent =
@@ -223,4 +241,9 @@ export type ClientEvent =
   | { type: "llm.providers.save"; payload: { settings: LLMProviderSettings } }
   | { type: "llm.models.fetch"; payload: { providerId: string } }
   | { type: "llm.models.test"; payload: { provider: LLMProvider } }
-  | { type: "llm.models.check" };
+  | { type: "llm.models.check" }
+  // Skills events
+  | { type: "skills.get" }
+  | { type: "skills.refresh" }
+  | { type: "skills.toggle"; payload: { skillId: string; enabled: boolean } }
+  | { type: "skills.set-marketplace"; payload: { url: string } };

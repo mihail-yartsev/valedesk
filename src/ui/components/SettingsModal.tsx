@@ -8,8 +8,10 @@ import type {
   LLMProvider,
   LLMModel,
   LLMProviderSettings,
-  LLMProviderType
+  LLMProviderType,
+  Skill
 } from "../types";
+import { SkillsTab } from "./SkillsTab";
 
 type SettingsModalProps = {
   onClose: () => void;
@@ -17,7 +19,7 @@ type SettingsModalProps = {
   currentSettings: ApiSettings | null;
 };
 
-type TabId = 'llm-models' | 'web-tools' | 'tools' | 'memory-mode';
+type TabId = 'llm-models' | 'web-tools' | 'tools' | 'skills' | 'memory-mode';
 
 export function SettingsModal({ onClose, onSave, currentSettings }: SettingsModalProps) {
   const [activeTab, setActiveTab] = useState<TabId>('llm-models');
@@ -55,6 +57,13 @@ export function SettingsModal({ onClose, onSave, currentSettings }: SettingsModa
   const [llmModels, setLlmModels] = useState<LLMModel[]>([]);
   const [llmLoading, setLlmLoading] = useState(false);
   const [llmError, setLlmError] = useState<string | null>(null);
+
+  // Skills state
+  const [skills, setSkills] = useState<Skill[]>([]);
+  const [skillsMarketplaceUrl, setSkillsMarketplaceUrl] = useState("");
+  const [skillsLastFetched, setSkillsLastFetched] = useState<number | undefined>();
+  const [skillsLoading, setSkillsLoading] = useState(false);
+  const [skillsError, setSkillsError] = useState<string | null>(null);
 
   const loadMemoryContent = useCallback(async () => {
     setMemoryLoading(true);
@@ -186,6 +195,48 @@ export function SettingsModal({ onClose, onSave, currentSettings }: SettingsModa
     setLlmProviders(prev => prev.filter(p => p.id !== providerId));
     setLlmModels(prev => prev.filter(m => m.providerId !== providerId));
   };
+
+  // Skills functions
+  const loadSkills = useCallback(() => {
+    setSkillsLoading(true);
+    setSkillsError(null);
+    window.electron.sendClientEvent({ type: "skills.get" });
+  }, []);
+
+  const refreshSkills = useCallback(() => {
+    setSkillsLoading(true);
+    setSkillsError(null);
+    window.electron.sendClientEvent({ type: "skills.refresh" });
+  }, []);
+
+  const toggleSkill = useCallback((skillId: string, enabled: boolean) => {
+    window.electron.sendClientEvent({ type: "skills.toggle", payload: { skillId, enabled } });
+    setSkills(prev => prev.map(s => s.id === skillId ? { ...s, enabled } : s));
+  }, []);
+
+  const setMarketplaceUrl = useCallback((url: string) => {
+    window.electron.sendClientEvent({ type: "skills.set-marketplace", payload: { url } });
+    setSkillsMarketplaceUrl(url);
+  }, []);
+
+  // Load skills on mount
+  useEffect(() => {
+    loadSkills();
+    
+    const unsubscribe = window.electron.onServerEvent((event) => {
+      if (event.type === "skills.loaded") {
+        setSkills(event.payload.skills);
+        setSkillsMarketplaceUrl(event.payload.marketplaceUrl);
+        setSkillsLastFetched(event.payload.lastFetched);
+        setSkillsLoading(false);
+      } else if (event.type === "skills.error") {
+        setSkillsError(event.payload.message);
+        setSkillsLoading(false);
+      }
+    });
+
+    return () => unsubscribe();
+  }, [loadSkills]);
 
   const handleSave = async () => {
     const tempValue = parseFloat(temperature);
@@ -326,6 +377,16 @@ export function SettingsModal({ onClose, onSave, currentSettings }: SettingsModa
               Tools
             </button>
             <button
+              onClick={() => setActiveTab('skills')}
+              className={`px-5 py-3 text-sm font-medium transition-colors whitespace-nowrap ${
+                activeTab === 'skills'
+                  ? 'text-ink-900 border-b-2 border-accent'
+                  : 'text-ink-600 hover:text-ink-900'
+              }`}
+            >
+              Skills
+            </button>
+            <button
               onClick={() => setActiveTab('memory-mode')}
               className={`px-5 py-3 text-sm font-medium transition-colors whitespace-nowrap ${
                 activeTab === 'memory-mode'
@@ -386,6 +447,19 @@ export function SettingsModal({ onClose, onSave, currentSettings }: SettingsModa
                 enableImageTools={enableImageTools}
                 setEnableImageTools={setEnableImageTools}
               />
+            ) : activeTab === 'skills' ? (
+              <div className="p-6">
+                <SkillsTab
+                  skills={skills}
+                  marketplaceUrl={skillsMarketplaceUrl}
+                  lastFetched={skillsLastFetched}
+                  loading={skillsLoading}
+                  error={skillsError}
+                  onToggleSkill={toggleSkill}
+                  onRefresh={refreshSkills}
+                  onSetMarketplaceUrl={setMarketplaceUrl}
+                />
+              </div>
             ) : (
               <MemoryModeTab
                 enableMemory={enableMemory}

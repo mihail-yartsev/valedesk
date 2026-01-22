@@ -48,7 +48,12 @@ All tools follow snake_case naming convention: verb_noun
 
 **Task Planning:**
 - `manage_todos` - Create and track task lists for complex operations
+
+**Skills:**
+- `load_skill` - Load specialized skills with detailed instructions for specific tasks
 </AVAILABLE_TOOLS>
+
+{skills_section}
 
 <OS_SPECIFIC_COMMANDS os="{osName}">
 <command_reference>

@@ -5,6 +5,7 @@
 import { readFileSync, existsSync, readdirSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { generateSkillsPromptSection } from './tools/skills-tool.js';
 
 // Get current directory in ES modules
 const __filename = fileURLToPath(import.meta.url);
@@ -112,6 +113,9 @@ export function getSystemPrompt(cwd: string, settings?: PromptSettings | null): 
   const attachImageLine = settings?.enableImageTools
     ? '- `attach_image` - Attach local image (converted to WebP for model input)'
     : '';
+  
+  // Build skills section (dynamically generated based on enabled skills)
+  const skillsSection = generateSkillsPromptSection();
 
   // Replace placeholders
   template = template
@@ -128,7 +132,8 @@ export function getSystemPrompt(cwd: string, settings?: PromptSettings | null): 
     .replace(/{sandboxPackages}/g, sandboxPackagesInfo)
     .replace(/{read_page_line}/g, readPageLine)
     .replace(/{memory_line}/g, memoryLine)
-    .replace(/{attach_image_line}/g, attachImageLine);
+    .replace(/{attach_image_line}/g, attachImageLine)
+    .replace(/{skills_section}/g, skillsSection);
 
   return template;
 }

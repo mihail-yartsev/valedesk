@@ -60,6 +60,7 @@ import {
   executeSearchNewsTool,
   executeSearchImagesTool,
 } from "./tools/duckduckgo-search-tool.js";
+import { SkillsTool } from "./tools/skills-tool.js";
 import type { SchedulerStore } from "./scheduler-store.js";
 
 export { ToolResult };
@@ -71,6 +72,7 @@ export class ToolExecutor {
   private extractPageTool: ExtractPageContentTool | null = null;
   private zaiReaderTool: ZaiReaderTool | null = null;
   private scheduleTaskTool: ScheduleTaskTool | null = null;
+  private skillsTool: SkillsTool;
 
   constructor(
     cwd: string,
@@ -136,6 +138,9 @@ export class ToolExecutor {
     if (schedulerStore) {
       this.scheduleTaskTool = new ScheduleTaskTool(schedulerStore);
     }
+
+    // Initialize skills tool
+    this.skillsTool = new SkillsTool();
   }
 
   // Update settings dynamically (e.g., when user adds Tavily API key)
@@ -423,6 +428,10 @@ export class ToolExecutor {
 
         case "Scheduler":
           return await this.executeScheduleTask(args, context);
+
+        // Skills tool
+        case "load_skill":
+          return await this.skillsTool.execute(args as any, context);
 
         default:
           return {

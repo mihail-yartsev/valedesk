@@ -16,6 +16,8 @@ import type { CreateTaskPayload, ThreadTask } from "./types.js";
 import { webCache } from "./libs/web-cache.js";
 import { loadLLMProviderSettings, saveLLMProviderSettings } from "./libs/llm-providers-store.js";
 import { fetchModelsFromProvider, checkModelsAvailability, validateProvider, createProvider } from "./libs/llm-providers.js";
+import { loadSkillsSettings, saveSkillsSettings, toggleSkill, setMarketplaceUrl } from "./libs/skills-store.js";
+import { fetchSkillsFromMarketplace } from "./libs/skills-loader.js";
 
 const DB_PATH = join(app.getPath("userData"), "sessions.db");
 const sessions = new SessionStore(DB_PATH);
@@ -1244,6 +1246,55 @@ export async function handleClientEvent(event: ClientEvent, windowId: number) {
       type: "llm.models.checked",
       payload: { unavailableModels }
     });
+    return;
+  }
+
+  // Skills handlers
+  if (event.type === "skills.get") {
+    const settings = loadSkillsSettings();
+    sessionManager.emitToWindow(windowId, {
+      type: "skills.loaded",
+      payload: {
+        skills: settings.skills,
+        marketplaceUrl: settings.marketplaceUrl,
+        lastFetched: settings.lastFetched
+      }
+    });
+    return;
+  }
+
+  if (event.type === "skills.refresh") {
+    fetchSkillsFromMarketplace()
+      .then(skills => {
+        const settings = loadSkillsSettings();
+        sessionManager.emitToWindow(windowId, {
+          type: "skills.loaded",
+          payload: {
+            skills: settings.skills,
+            marketplaceUrl: settings.marketplaceUrl,
+            lastFetched: settings.lastFetched
+          }
+        });
+      })
+      .catch(error => {
+        console.error('[IPC] Failed to refresh skills:', error);
+        sessionManager.emitToWindow(windowId, {
+          type: "skills.error",
+          payload: { message: String(error) }
+        });
+      });
+    return;
+  }
+
+  if (event.type === "skills.toggle") {
+    const { skillId, enabled } = event.payload;
+    toggleSkill(skillId, enabled);
+    return;
+  }
+
+  if (event.type === "skills.set-marketplace") {
+    const { url } = event.payload;
+    setMarketplaceUrl(url);
     return;
   }
 }

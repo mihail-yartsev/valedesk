@@ -8,7 +8,9 @@ const resetStore = () => {
     sessions: {},
     activeSessionId: null,
     historyRequested: new Set(),
-    globalError: null
+    globalError: null,
+    schedulerDefaultTemperature: null,
+    schedulerDefaultSendTemperature: null
   }, true);
 };
 
@@ -57,5 +59,47 @@ describe("useAppStore session.history pagination", () => {
 
     const session = useAppStore.getState().sessions["s1"];
     expect(session.messages.map((m: any) => m.prompt)).toEqual(["m1", "m2"]);
+  });
+});
+
+describe("scheduler.default_temperature.loaded event", () => {
+  beforeEach(() => resetStore());
+
+  it("saves temperature and sendTemperature to store", () => {
+    useAppStore.getState().handleServerEvent({
+      type: "scheduler.default_temperature.loaded",
+      payload: { temperature: 0.7, sendTemperature: true }
+    } as any);
+
+    const state = useAppStore.getState();
+    expect(state.schedulerDefaultTemperature).toBe(0.7);
+    expect(state.schedulerDefaultSendTemperature).toBe(true);
+  });
+
+  it("handles sendTemperature=false correctly", () => {
+    useAppStore.getState().handleServerEvent({
+      type: "scheduler.default_temperature.loaded",
+      payload: { temperature: 0.3, sendTemperature: false }
+    } as any);
+
+    expect(useAppStore.getState().schedulerDefaultSendTemperature).toBe(false);
+  });
+
+  it("handles temperature=0 without treating it as falsy", () => {
+    useAppStore.getState().handleServerEvent({
+      type: "scheduler.default_temperature.loaded",
+      payload: { temperature: 0, sendTemperature: true }
+    } as any);
+
+    expect(useAppStore.getState().schedulerDefaultTemperature).toBe(0);
+  });
+});
+
+describe("scheduler default temperature initial state", () => {
+  it("has null defaults before loading", () => {
+    resetStore();
+    const state = useAppStore.getState();
+    expect(state.schedulerDefaultTemperature).toBeNull();
+    expect(state.schedulerDefaultSendTemperature).toBeNull();
   });
 });

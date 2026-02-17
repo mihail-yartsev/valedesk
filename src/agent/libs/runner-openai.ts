@@ -270,7 +270,8 @@ export async function runClaude(options: RunnerOptions): Promise<RunnerHandle> {
             );
             if (matchingModel) {
               resolvedProvider = llmSettings.providers.find(p => p.id === matchingModel.providerId && p.enabled !== false);
-              resolvedModelId = matchingModel.id;
+              // Use model name (not full id which includes providerId:: prefix)
+              resolvedModelId = matchingModel.name;
             }
 
             // If no exact match, pick the first enabled model from any enabled provider
@@ -278,7 +279,8 @@ export async function runClaude(options: RunnerOptions): Promise<RunnerHandle> {
               const firstEnabled = llmSettings.models.find(m => m.enabled !== false);
               if (firstEnabled) {
                 resolvedProvider = llmSettings.providers.find(p => p.id === firstEnabled.providerId && p.enabled !== false);
-                resolvedModelId = firstEnabled.id;
+                // Use model name (not full id which includes providerId:: prefix)
+                resolvedModelId = firstEnabled.name;
                 console.warn(`[OpenAI Runner] Model "${sessionModelName}" not found in providers, falling back to "${resolvedModelId}"`);
               }
             }

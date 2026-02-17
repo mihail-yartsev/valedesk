@@ -141,10 +141,11 @@ export class SkillsTool extends BaseTool {
     try {
       // Pass cwd to download skill to workspace/skills/
       const content = await readSkillContent(skillId, cwd);
+      const skillDir = await getSkillPath(skillId, cwd);
       
       return {
         success: true,
-        output: `## Skill: ${skill.name}\n\n${content}`
+        output: `## Skill: ${skill.name}\n\n**Skill directory:** \`${skillDir}\`\n\n> **Important:** All relative paths in this skill (scripts/, references/, config/, .env, etc.) must be resolved relative to the skill directory above, NOT relative to the user's working directory.\n\n${content}`
       };
     } catch (error: any) {
       return {
@@ -167,12 +168,13 @@ export class SkillsTool extends BaseTool {
     
     try {
       const files = await listSkillFiles(skillId, cwd);
+      const skillDir = await getSkillPath(skillId, cwd);
       
       const filesList = files.map((f: string) => `- ${f}`).join("\n");
       
       return {
         success: true,
-        output: `## Files in skill "${skillId}":\n\n${filesList}\n\n**To read these files, use this tool again with:**\n\`\`\`json\n{ "operation": "read_file", "skill_id": "${skillId}", "file_path": "<filename>" }\n\`\`\`\n\n⚠️ Do NOT use the regular \`read_file\` tool - these files are inside the skill directory.`
+        output: `## Files in skill "${skillId}":\n\n**Skill directory:** \`${skillDir}\`\n\n${filesList}\n\n**To read these files, use this tool again with:**\n\`\`\`json\n{ "operation": "read_file", "skill_id": "${skillId}", "file_path": "<filename>" }\n\`\`\`\n\n⚠️ Do NOT use the regular \`read_file\` tool - these files are inside the skill directory.\n⚠️ All relative paths in scripts/config must be resolved relative to \`${skillDir}\`, NOT the user's working directory.`
       };
     } catch (error: any) {
       return {
@@ -195,10 +197,11 @@ export class SkillsTool extends BaseTool {
     
     try {
       const content = await readSkillFile(skillId, filePath, cwd);
+      const skillDir = await getSkillPath(skillId, cwd);
       
       return {
         success: true,
-        output: `## File: ${filePath}\n\n\`\`\`\n${content}\n\`\`\``
+        output: `## File: ${filePath}\n\n**Full path:** \`${skillDir}/${filePath}\`\n\n\`\`\`\n${content}\n\`\`\``
       };
     } catch (error: any) {
       return {
@@ -210,18 +213,21 @@ export class SkillsTool extends BaseTool {
 }
 
 /**
- * Generate skills context for system prompt
+ * Generate skills context for system prompt.
+ * Includes skill directory paths so the agent knows where files are located.
+ * @param cwd - Optional working directory for resolving skill paths
  */
-export function generateSkillsPromptSection(): string {
+export function generateSkillsPromptSection(cwd?: string): string {
   const enabledSkills = getEnabledSkills();
   
   if (enabledSkills.length === 0) {
     return "";
   }
   
-  const skillsList = enabledSkills.map((skill: Skill) => 
-    `- **${skill.name}**: ${skill.description}`
-  ).join("\n");
+  // Build skills list with paths (resolved asynchronously at startup, cached)
+  const skillsList = enabledSkills.map((skill: Skill) => {
+    return `- **${skill.name}**: ${skill.description}`;
+  }).join("\n");
   
   return `
 ## Available Skills
@@ -237,6 +243,9 @@ ${skillsList}
 2. Follow the instructions in the skill's SKILL.md
 3. Use operation "list_files" to see available scripts and references
 4. Use operation "read_file" to read specific scripts or reference files
+5. When SKILL.md references relative paths (e.g., \`scripts/foo.py\`, \`config/.env\`), resolve them relative to the **skill directory** shown in the output, NOT relative to the user's working directory
+6. If \`scripts/\` exist in the skill, prefer running or patching them instead of retyping large code blocks
+7. If the skill has a \`config/\` or similar directory with \`.env\` or config files, read them from the skill directory path
 
 Skills help you follow best practices and produce consistent, high-quality results.
 `;

@@ -189,7 +189,8 @@ fn emit_server_event_app(app: &tauri::AppHandle, event: &Value) -> Result<(), St
 }
 
 fn memory_path() -> Result<PathBuf, String> {
-  Ok(home_dir()?.join(".valera").join("memory.md"))
+  // Use the same path as the agent tool: ~/Library/Application Support/ValeDesk/memory.md
+  Ok(app_data_dir()?.join("memory.md"))
 }
 
 /// Handle scheduler.request events from sidecar - execute scheduler operations
@@ -577,6 +578,19 @@ fn start_sidecar(app: tauri::AppHandle, sidecar_state: &SidecarState) -> Result<
                     handle_session_sync(&state.db, payload);
                   }
                   continue; // Don't emit to frontend
+                }
+                
+                // Intercept session.list from sidecar - replace with full DB list
+                // Sidecar only has in-memory sessions; DB has the complete set
+                if event_type == "session.list" {
+                  let state: tauri::State<'_, AppState> = app_handle.state();
+                  if let Ok(sessions) = state.db.list_sessions() {
+                    let _ = emit_server_event_app(&app_handle, &json!({
+                      "type": "session.list",
+                      "payload": { "sessions": sessions }
+                    }));
+                  }
+                  continue; // Don't forward sidecar's partial list
                 }
                 
                 // Handle scheduler.request events from sidecar
@@ -1460,6 +1474,52 @@ fn client_event(app: tauri::AppHandle, state: tauri::State<'_, AppState>, event:
       }
     }
 
+    // session.compact - enrich with session data and messages from DB for sidecar to restore
+    "session.compact" => {
+      let payload = event.get("payload").ok_or_else(|| "[session.compact] missing payload".to_string())?;
+      let session_id = payload.get("sessionId").and_then(|v| v.as_str())
+        .ok_or_else(|| "[session.compact] missing sessionId".to_string())?;
+
+      eprintln!("[session.compact] Looking up session: {}", session_id);
+
+      // Also load LLM provider settings so sidecar can resolve the model
+      let llm_settings = state.db.get_llm_provider_settings().ok();
+      let api_settings = state.db.get_api_settings().ok().flatten();
+
+      match state.db.get_session_history(session_id) {
+        Ok(Some(history)) => {
+          eprintln!("[session.compact] Found session: title='{}', messages={}", 
+            history.session.title, history.messages.len());
+
+          let enriched_event = json!({
+            "type": "session.compact",
+            "payload": {
+              "sessionId": session_id,
+              "sessionData": {
+                "title": history.session.title,
+                "cwd": history.session.cwd,
+                "model": history.session.model,
+                "allowedTools": history.session.allowed_tools,
+                "temperature": history.session.temperature
+              },
+              "messages": history.messages,
+              "llmProviderSettings": llm_settings,
+              "apiSettings": api_settings
+            }
+          });
+          send_to_sidecar(app, state.inner(), &enriched_event)
+        }
+        Ok(None) => {
+          eprintln!("[session.compact] Session {} NOT FOUND in DB!", session_id);
+          send_to_sidecar(app, state.inner(), &event)
+        }
+        Err(e) => {
+          eprintln!("[session.compact] DB error: {}", e);
+          send_to_sidecar(app, state.inner(), &event)
+        }
+      }
+    }
+
     // Settings - handled in Rust DB (with fallback to sidecar for migration)
     "settings.get" => {
       match state.db.get_api_settings() {
@@ -1933,58 +1993,44 @@ fn get_old_app_dirs() -> Vec<PathBuf> {
   dirs
 }
 
-/// Migrate ~/.localdesk/ to ~/.valera/
-fn migrate_dot_localdesk() {
+/// Migrate old memory locations to app_data_dir
+fn migrate_old_memory() {
+  let app_dir = match app_data_dir() {
+    Ok(d) => d,
+    Err(_) => return,
+  };
+  
+  let new_memory = app_dir.join("memory.md");
+  
+  // Skip if app_data_dir already has memory.md
+  if new_memory.exists() {
+    return;
+  }
+  
   let home = match home_dir() {
     Ok(h) => h,
     Err(_) => return,
   };
   
-  let old_dir = home.join(".localdesk");
-  let new_dir = home.join(".valera");
+  // Try to migrate from old locations in order of priority
+  let old_locations = [
+    home.join(".valera").join("memory.md"),
+    home.join(".localdesk").join("memory.md"),
+  ];
   
-  // Skip if old dir doesn't exist
-  if !old_dir.exists() {
-    return;
-  }
-  
-  // Skip if new dir already has memory.md (already migrated)
-  let new_memory = new_dir.join("memory.md");
-  if new_memory.exists() {
-    return;
-  }
-  
-  eprintln!("[migration] Found old ~/.localdesk/ data");
-  eprintln!("[migration] Migrating to ~/.valera/");
-  
-  // Create new directory
-  if let Err(e) = fs::create_dir_all(&new_dir) {
-    eprintln!("[migration] Failed to create ~/.valera/: {e}");
-    return;
-  }
-  
-  // Copy memory.md if exists
-  let old_memory = old_dir.join("memory.md");
-  if old_memory.exists() {
-    if let Err(e) = fs::copy(&old_memory, &new_memory) {
-      eprintln!("[migration] Failed to copy memory.md: {e}");
-    } else {
-      eprintln!("[migration] Copied memory.md");
+  for old_memory in old_locations {
+    if old_memory.exists() {
+      eprintln!("[migration] Found old memory at {}", old_memory.display());
+      eprintln!("[migration] Migrating to {}", new_memory.display());
+      
+      if let Err(e) = fs::copy(&old_memory, &new_memory) {
+        eprintln!("[migration] Failed to copy memory.md: {e}");
+      } else {
+        eprintln!("[migration] Memory migration complete!");
+      }
+      return; // Stop after first successful migration
     }
   }
-  
-  // Copy logs directory if exists
-  let old_logs = old_dir.join("logs");
-  let new_logs = new_dir.join("logs");
-  if old_logs.exists() && old_logs.is_dir() {
-    if let Err(e) = copy_dir_recursive(&old_logs, &new_logs) {
-      eprintln!("[migration] Failed to copy logs: {e}");
-    } else {
-      eprintln!("[migration] Copied logs directory");
-    }
-  }
-  
-  eprintln!("[migration] ~/.valera/ migration complete!");
 }
 
 /// Recursively copy a directory
@@ -2007,8 +2053,8 @@ fn main() {
   // Migrate data from old LocalDesk directory if needed
   migrate_from_localdesk();
   
-  // Migrate ~/.localdesk/ to ~/.valera/
-  migrate_dot_localdesk();
+  // Migrate old memory locations to app_data_dir
+  migrate_old_memory();
   
   // Initialize database
   let user_data_dir = app_data_dir().expect("Failed to get app data dir");

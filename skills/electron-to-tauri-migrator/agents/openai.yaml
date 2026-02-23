@@ -1,0 +1,4 @@
+interface:
+  display_name: "Electron to Tauri Migrator"
+  short_description: "Migrate Electron apps to Tauri safely"
+  default_prompt: "Use $electron-to-tauri-migrator to migrate this Electron app to Tauri with a phased plan and verification checklist."
